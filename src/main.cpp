@@ -1,4 +1,4 @@
-#include "app.h"
+﻿#include "app.h"
 #include "ui.h"
 #include "services.h"
 #include "settings.h"
@@ -827,6 +827,22 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int nCmdShow) {
     for (int i = 1; i < argc; i++) {
         std::wstring a = argv[i];
         if (a == L"--background") background = true;
+        else if (a == L"--debug-startup=on") startupFlag = 1;
+        else if (a == L"--debug-startup=off") startupFlag = -1;
+        else if (a == L"--light") { s->settings.dark = false; s->captureTheme = 0; }
+        else if (a == L"--dark") { s->settings.dark = true; s->captureTheme = 1; }
+        else if (a.rfind(L"--debug-screenshot=", 0) == 0) { s->captureMode = true; s->capturePath = a.substr(19); }
+        else if (a == L"--debug-screenshot" && i + 1 < argc) { s->captureMode = true; s->capturePath = argv[++i]; }
+        else if (a.rfind(L"--wait=", 0) == 0) waitMs = _wtoi(a.c_str() + 7);
+        else if (a.rfind(L"--page=", 0) == 0) s->capturePage = _wtoi(a.c_str() + 7);
+        else if (a == L"--debug-settings") s->settingsOpen = true;
+        else if (a.rfind(L"--search=", 0) == 0) { s->searchQuery = a.substr(9); s->searchOpen = true; }
+        else if (a.rfind(L"--debug-pick=", 0) == 0) s->autoPick = _wtoi(a.c_str() + 13);
+        else if (a.rfind(L"--theme=", 0) == 0) {
+            std::wstring t = a.substr(8);
+            s->captureTheme = (t == L"light" || t == L"flat") ? 0 : 1;
+            s->settings.dark = s->captureTheme == 1;
+        }
     }
     LocalFree(argv);
     if (startupFlag) {
@@ -836,7 +852,7 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int nCmdShow) {
     }
     if (s->captureMode) {
         s->captureAt = (DWORD)GetTickCount64() + (DWORD)std::max(1500, waitMs);
-        if (s->capturePage >= 0 && s->capturePage <= 3) s->page = s->capturePage;
+        if (s->capturePage >= 0 && s->capturePage <= 4) s->page = s->capturePage;
         s->settings.animations = false;
         nCmdShow = SW_SHOW;
     }
@@ -877,7 +893,7 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int nCmdShow) {
         wy = work.top + (work.bottom - work.top - (int)(wh * s->dpi)) / 2;
     }
 
-    HWND hwnd = CreateWindowExW(WS_EX_APPWINDOW, L"AuraWeatherMain", L"AURA 天气 1.4.0",
+    HWND hwnd = CreateWindowExW(WS_EX_APPWINDOW, L"AuraWeatherMain", L"AURA 天气 2.0.2",
                                 WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN,
                                 wx, wy, (int)std::lround(ww * s->dpi), (int)std::lround(wh * s->dpi),
                                 nullptr, nullptr, hInst, nullptr);
@@ -951,6 +967,9 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int nCmdShow) {
     CoUninitialize();
     return (int)msg.wParam;
 }
+
+
+
 
 
 

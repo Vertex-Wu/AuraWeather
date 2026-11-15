@@ -4,13 +4,17 @@
 #include "settings.h"
 
 #include <windows.h>
+#include <thread>
+#include <atomic>
 #include <objidl.h>
 #include <propidl.h>
 #include <gdiplus.h>
 #include <shlwapi.h>
+#include <shellapi.h>
 #include <cmath>
 #include <cstdio>
 #include <cstdarg>
+#include <cstdlib>
 #include <cwchar>
 #include <map>
 #include <set>
@@ -417,21 +421,22 @@ static void drawCloud(Graphics& g, Rect r, bool heavy, bool hero) {
 static void drawDrops(Graphics& g, Rect r, int count, double t, bool snow, bool hero) {
     float s = std::min(r.w, r.h);
     float x = r.x + (r.w - s) * 0.5f, y = r.y + (r.h - s) * 0.5f;
+    float start = 0.5f - (count - 1) * 0.075f;
     for (int i = 0; i < count; i++) {
-        float bx = x + s * (0.26f + i * 0.16f);
-        float by = y + s * 0.79f;
-        float off = fmodf((float)t * 0.55f + i * 0.31f, 1.0f) * s * 0.10f;
+        float bx = x + s * (start + i * 0.15f);
+        float by = y + s * 0.785f;
+        float off = fmodf((float)t * 0.55f + i * 0.31f, 1.0f) * s * 0.06f;
         if (!snow) {
-            float len = s * 0.075f;
-            line(g, bx, by + off, bx, by + off + len, Color(205, 123, 232, 255), std::max(1.4f, s * 0.018f));
-            ellipse(g, bx - s * 0.008f, by + off - s * 0.010f, s * 0.016f, s * 0.016f, Color(220, 170, 246, 255));
+            float len = s * 0.055f;
+            line(g, bx, by + off, bx, by + off + len, Color(205, 123, 232, 255), std::max(1.2f, s * 0.014f));
+            ellipse(g, bx - s * 0.006f, by + off - s * 0.008f, s * 0.012f, s * 0.012f, Color(220, 170, 246, 255));
         } else {
             float cx = bx, cy = by + off;
-            float rr = s * 0.028f;
+            float rr = s * 0.024f;
             for (int k = 0; k < 3; k++) {
                 float a = (float)(k * M_PI / 3.0 + t * 0.3);
                 line(g, cx - cosf(a) * rr, cy - sinf(a) * rr, cx + cosf(a) * rr, cy + sinf(a) * rr,
-                     Color(225, 235, 250, 255), std::max(1.0f, s * 0.012f));
+                     Color(225, 235, 250, 255), std::max(0.9f, s * 0.010f));
             }
         }
     }
@@ -442,11 +447,11 @@ static void drawBolt(Graphics& g, Rect r) {
     float x = r.x + (r.w - s) * 0.5f, y = r.y + (r.h - s) * 0.5f;
     GraphicsPath p;
     p.AddPolygon(std::vector<PointF>{
-        PointF(x + 0.53f * s, y + 0.72f * s), PointF(x + 0.41f * s, y + 0.98f * s),
-        PointF(x + 0.49f * s, y + 0.98f * s), PointF(x + 0.43f * s, y + 1.14f * s),
-        PointF(x + 0.63f * s, y + 0.90f * s), PointF(x + 0.53f * s, y + 0.90f * s)
+        PointF(x + 0.55f * s, y + 0.70f * s), PointF(x + 0.47f * s, y + 0.84f * s),
+        PointF(x + 0.52f * s, y + 0.84f * s), PointF(x + 0.48f * s, y + 0.98f * s),
+        PointF(x + 0.62f * s, y + 0.80f * s), PointF(x + 0.55f * s, y + 0.80f * s)
     }.data(), 6);
-    LinearGradientBrush b(PointF(0, y + 0.7f * s), PointF(0, y + 1.12f * s),
+    LinearGradientBrush b(PointF(0, y + 0.7f * s), PointF(0, y + 0.99f * s),
                           Color(255, 255, 225, 110), Color(255, 255, 173, 47));
     g.FillPath(&b, &p);
 }
@@ -458,17 +463,17 @@ static void drawWeatherIconRaw(Graphics& g, Cond cond, bool isDay, Rect r, bool 
         return;
     }
     if (cond == Cond::Fair) {
-        Rect sun = { r.x + r.w * 0.40f, r.y - r.h * 0.02f, r.w * 0.62f, r.h * 0.62f };
+        Rect sun = { r.x + r.w * 0.52f, r.y + r.h * 0.12f, r.w * 0.41f, r.h * 0.41f };
         if (isDay) drawSun(g, sun, hero, t);
         else drawMoon(g, sun, hero, t, themeDark == 1);
-        drawCloud(g, { r.x + r.w * 0.08f, r.y + r.h * 0.42f, r.w * 0.62f, r.h * 0.44f }, false, hero);
+        drawCloud(g, { r.x + r.w * 0.06f, r.y + r.h * 0.08f, r.w * 0.72f, r.h * 0.52f }, false, hero);
         return;
     }
     if (cond == Cond::Partly) {
-        Rect sun = { r.x + r.w * 0.52f, r.y - r.h * 0.04f, r.w * 0.50f, r.h * 0.50f };
+        Rect sun = { r.x + r.w * 0.52f, r.y + r.h * 0.10f, r.w * 0.50f, r.h * 0.50f };
         if (isDay) drawSun(g, sun, hero, t);
         else drawMoon(g, sun, hero, t, themeDark == 1);
-        drawCloud(g, { r.x + r.w * 0.05f, r.y + r.h * 0.28f, r.w * 0.85f, r.h * 0.60f }, false, hero);
+        drawCloud(g, { r.x + r.w * 0.04f, r.y + r.h * 0.04f, r.w * 0.86f, r.h * 0.64f }, false, hero);
         return;
     }
     if (cond == Cond::Cloudy) {
@@ -490,10 +495,10 @@ static void drawWeatherIconRaw(Graphics& g, Cond cond, bool isDay, Rect r, bool 
         return;
     }
     if (cond == Cond::Showers) {
-        Rect small = { r.x + r.w * 0.54f, r.y + r.h * 0.01f, r.w * 0.48f, r.h * 0.48f };
+        Rect small = { r.x + r.w * 0.52f, r.y + r.h * 0.10f, r.w * 0.49f, r.h * 0.49f };
         if (isDay) drawSun(g, small, hero, t);
         else drawMoon(g, small, hero, t, themeDark == 1);
-        drawCloud(g, { r.x + r.w * 0.06f, r.y + r.h * 0.24f, r.w * 0.82f, r.h * 0.60f }, false, hero);
+        drawCloud(g, { r.x + r.w * 0.05f, r.y + r.h * 0.02f, r.w * 0.84f, r.h * 0.64f }, false, hero);
         drawDrops(g, { r.x, r.y, r.w, r.h }, 3, t, false, hero);
         return;
     }
@@ -735,7 +740,7 @@ static void drawLogo(Graphics& g, Rect r, const Pal& p) {
 // ---------------- layout ----------------
 struct Layout {
     Rect sidebar, topbar, titleArea, search, themeBtn, settingsBtn, winMin, winMax, winClose;
-    Rect tabs[4], tabBar, statusText;
+    Rect tabs[5], tabBar, statusText;
     Rect autoItem, addCity, bottomTheme, bottomSettings, sidebarStatus;
     Rect city[12];
     int cityCount = 0;
@@ -743,10 +748,10 @@ struct Layout {
     Rect hero, metrics[4], hourly, weekly, weeklyCol[7], showTen, retry;
     Rect chart, details, tenCard, tenRow[10];
     Rect map, mapPrev, mapNext, mapZoomIn, mapZoomOut, mapReset, mapInfo, mapDate;
-    Rect dlg, closeDlg, themeDark, themeLight, unitC, unitF, toggles[5], clearBtn;
+    Rect dlg, closeDlg, themeDark, themeLight, unitC, unitF, toggles[5], clearBtn, updateBtn;
     Rect searchCard, searchRow[6];
     int searchRowCount = 0;
-    Rect advice;
+    Rect advice, alertBar;
 };
 
 static Layout layout(const AppState& s) {
@@ -761,8 +766,9 @@ static Layout layout(const AppState& s) {
     L.winMin = { W - 102, 22, 26, 26 };
     L.winMax = { W - 69, 22, 26, 26 };
     L.winClose = { W - 36, 22, 26, 26 };
-    L.tabBar = { SIDEBAR_W + PAD, TABS_Y, 500, 40 };
-    for (int i = 0; i < 4; i++) L.tabs[i] = { L.tabBar.x + i * 125.0f, L.tabBar.y, 125, 40 };
+    float tabW = std::min(126.0f, (W - 400.0f - (SIDEBAR_W + PAD)) / 5.0f);
+    L.tabBar = { SIDEBAR_W + PAD, TABS_Y, tabW * 5, 40 };
+    for (int i = 0; i < 5; i++) L.tabs[i] = { L.tabBar.x + i * tabW, L.tabBar.y, tabW, 40 };
     L.statusText = { W - 380, TABS_Y + 4, 350, 32 };
     L.content = { SIDEBAR_W + PAD, CONTENT_Y, W - SIDEBAR_W - 2 * PAD, H - CONTENT_Y - 46 };
     L.advice = { SIDEBAR_W + PAD, H - 34, W - SIDEBAR_W - 2 * PAD, 20 };
@@ -784,19 +790,25 @@ static Layout layout(const AppState& s) {
 
     float cw = L.content.w, ch = L.content.h;
     float gap = 14;
+    float top = L.content.y;
+    if (s.page == 0 && !s.weather.alertText.empty()) {
+        L.alertBar = { L.content.x, L.content.y, cw, 30 };
+        top += 40;
+        ch -= 40;
+    }
     float heroH = std::max(250.0f, ch * 0.43f);
     float hourlyH = std::max(166.0f, ch * 0.26f);
     float weeklyH = ch - heroH - hourlyH - 2 * gap;
     if (weeklyH < 146) { heroH -= (146 - weeklyH); weeklyH = 146; }
     float rightW = std::max(300.0f, std::min(360.0f, cw * 0.35f));
-    L.hero = { L.content.x, L.content.y, cw - rightW - gap, heroH };
+    L.hero = { L.content.x, top, cw - rightW - gap, heroH };
     float mx = L.hero.right() + gap;
     float mw = (rightW - 12) * 0.5f;
     float mh = (heroH - 12) * 0.5f;
-    L.metrics[0] = { mx, L.content.y, mw, mh };
-    L.metrics[1] = { mx + mw + 12, L.content.y, mw, mh };
-    L.metrics[2] = { mx, L.content.y + mh + 12, mw, mh };
-    L.metrics[3] = { mx + mw + 12, L.content.y + mh + 12, mw, mh };
+    L.metrics[0] = { mx, top, mw, mh };
+    L.metrics[1] = { mx + mw + 12, top, mw, mh };
+    L.metrics[2] = { mx, top + mh + 12, mw, mh };
+    L.metrics[3] = { mx + mw + 12, top + mh + 12, mw, mh };
     L.hourly = { L.content.x, L.hero.bottom() + gap, cw, hourlyH };
     L.weekly = { L.content.x, L.hourly.bottom() + gap, cw, std::max(146.0f, L.content.bottom() - L.hourly.bottom() - gap) };
     for (int i = 0; i < 7; i++) L.weeklyCol[i] = { L.weekly.x + i * L.weekly.w / 7.0f, L.weekly.y + 38, L.weekly.w / 7.0f, L.weekly.h - 38 };
@@ -829,6 +841,7 @@ static Layout layout(const AppState& s) {
     L.unitF = { L.unitC.right() + 10, L.dlg.y + 168, 90, 38 };
     for (int i = 0; i < 5; i++) L.toggles[i] = { L.dlg.x + 28, L.dlg.y + 242 + i * 48, dw - 56, 40 };
     L.clearBtn = { L.dlg.x + 28, L.dlg.bottom() - 58, 132, 34 };
+    L.updateBtn = { L.dlg.x + 172, L.dlg.bottom() - 58, 132, 34 };
 
     if (!s.searchResults.empty() || s.searchLoading || s.searchNoResult) {
         int rows = std::min(6, (int)s.searchResults.size());
@@ -986,8 +999,8 @@ static void drawSidebar(Graphics& g, const AppState& s, const Pal& p, const Layo
 }
 
 static void drawTopBar(Graphics& g, const AppState& s, const Pal& p, const Layout& L) {
-    static const wchar_t* titles[] = { L"天气概览", L"逐小时预报", L"未来十天", L"卫星云图" };
-    text(g, titles[std::max(0, std::min(3, s.page))], font(22, true), L.titleArea, p.text);
+    static const wchar_t* titles[] = { L"天气概览", L"逐小时预报", L"未来十天", L"日出与日落", L"月相" };
+    text(g, titles[std::max(0, std::min(4, s.page))], font(22, true), L.titleArea, p.text);
     text(g, localDateLine(s), font(11.5f), { L.titleArea.x + 1, L.titleArea.y + 30, 380, 19 }, p.sub);
 
     // search
@@ -1033,9 +1046,9 @@ static void drawTopBar(Graphics& g, const AppState& s, const Pal& p, const Layou
 static void drawTabs(Graphics& g, const AppState& s, const Pal& p, const Layout& L) {
     fillRound(g, L.tabBar, L.tabBar.h * 0.5f, p.dark ? Color(255, 18, 28, 42) : Color(255, 255, 255, 255));
     strokeRound(g, L.tabBar, L.tabBar.h * 0.5f, p.border);
-    static const wchar_t* names[] = { L"概览", L"逐小时", L"十天", L"云图" };
-    static const int icons[] = { MI_GRID, MI_CLOCK, MI_CALENDAR, MI_GLOBE };
-    for (int i = 0; i < 4; i++) {
+    static const wchar_t* names[] = { L"概览", L"逐小时", L"十天", L"日出", L"月相" };
+    static const int icons[] = { MI_GRID, MI_CLOCK, MI_CALENDAR, MI_SUNRISE, MI_MOON };
+    for (int i = 0; i < 5; i++) {
         Rect r = L.tabs[i];
         bool active = s.page == i;
         bool hover = r.has(s.mouseX, s.mouseY);
@@ -1058,7 +1071,7 @@ static void drawTabs(Graphics& g, const AppState& s, const Pal& p, const Layout&
     // right status
     if (s.updating) {
         spinner(g, L.statusText.x + 10, L.statusText.cy(), 7, s.animTime, p.accent);
-        text(g, L"正在同步卫星与天气数据…", font(10.5f), { L.statusText.x + 24, L.statusText.y, L.statusText.w - 24, L.statusText.h }, p.faint, 2, 1);
+        text(g, L"正在同步天气数据…", font(10.5f), { L.statusText.x + 24, L.statusText.y, L.statusText.w - 24, L.statusText.h }, p.faint, 2, 1);
     } else if (!s.errorText.empty()) {
         ellipse(g, L.statusText.x + 5, L.statusText.cy() - 3, 6, 6, p.danger);
         text(g, s.errorText, font(10.5f), { L.statusText.x + 18, L.statusText.y, L.statusText.w - 18, L.statusText.h }, p.danger, 2, 1);
@@ -1079,6 +1092,33 @@ static Rect heroRetryRect(const Layout& L) {
 
 static Rect hourlyMoreRect(const Layout& L) {
     return { L.hourly.right() - 164, L.hourly.y + 12, 146, 26 };
+}
+
+static int timeMinutes(const std::string& s) {
+    int h = 0, m = 0;
+    if (sscanf(s.c_str(), "%d:%d", &h, &m) != 2) return -1;
+    return h * 60 + m;
+}
+
+static void drawSunArc(Graphics& g, const AppState& s, const Pal& p, Rect r) {
+    if (s.weather.days.empty()) return;
+    int rise = timeMinutes(s.weather.days[0].sunrise);
+    int set = timeMinutes(s.weather.days[0].sunset);
+    if (rise < 0 || set < 0 || set <= rise) return;
+    CivilTime now = civilLocal((long long)time(nullptr), locationOffset(s));
+    int cur = now.h * 60 + now.mi;
+    float t = (float)(cur - rise) / (float)(set - rise);
+    t = std::max(0.0f, std::min(1.0f, t));
+    float cx = r.cx(), cy = r.bottom() - 8;
+    float rx = r.w * 0.42f, ry = r.h * 0.78f;
+    Pen pen(withAlpha(p.sub, 120), 1.4f);
+    g.DrawArc(&pen, cx - rx, cy - ry, rx * 2, ry * 2, 180.0f, 180.0f);
+    float a = (180.0f + 180.0f * t) * 3.14159265f / 180.0f;
+    float sx = cx + cosf(a) * rx, sy = cy + sinf(a) * ry;
+    ellipse(g, sx - 4, sy - 4, 8, 8, withAlpha(p.warn, 55));
+    ellipse(g, sx - 2.5f, sy - 2.5f, 5, 5, p.warn);
+    text(g, widen(s.weather.days[0].sunrise), font(11.0f), { cx - rx - 6, cy + 5, 58, 18 }, p.sub, 1);
+    text(g, widen(s.weather.days[0].sunset), font(11.0f), { cx + rx - 52, cy + 5, 58, 18 }, p.sub, 1);
 }
 
 static void drawHero(Graphics& g, const AppState& s, const Pal& p, const Layout& L) {
@@ -1143,9 +1183,11 @@ static void drawHero(Graphics& g, const AppState& s, const Pal& p, const Layout&
                                             L"     最低 " + tempText(w.days[0].tmin, s.settings.celsius, false));
     text(g, hi, font(11), { h.x + 31, h.y + (compact ? 176 : 214), 320, 19 }, p.sub);
 
-    // illustration
-    float art = compact ? std::min(h.h * 0.62f, 190.0f) : std::min(h.h * 0.72f, 250.0f);
-    Rect artR = { h.right() - art - h.w * 0.04f, h.y + h.h * (compact ? 0.08f : 0.10f), art, art };
+    // oversized primary weather icon on the right
+    float rightArea = h.w * 0.46f;
+    float art = std::min(rightArea * 0.94f, h.h * 0.80f);
+    Rect artR = { h.right() - rightArea + (rightArea - art) * 0.5f,
+                  h.y + (h.h - art) * 0.5f - 4, art, art };
     drawWeatherIcon(g, w.now.cond, w.now.isDay, artR, true, s.animTime, p.dark ? 1 : 0);
 
     // chips
@@ -1290,6 +1332,13 @@ static void drawWeekly(Graphics& g, const AppState& s, const Pal& p, const Layou
 }
 
 static void drawOverview(Graphics& g, AppState& s, const Pal& p, const Layout& L) {
+    if (!s.weather.alertText.empty()) {
+        Rect b = L.alertBar;
+        fillRound(g, b, 10, withAlpha(p.danger, p.dark ? 42 : 28));
+        strokeRound(g, b, 10, withAlpha(p.danger, 150));
+        text(g, widen(s.weather.alertText), font(11.5f, true),
+             { b.x + 12, b.y, b.w - 24, b.h }, p.danger, 1, 1);
+    }
     drawHero(g, s, p, L);
     drawMetrics(g, s, p, L);
     drawHourlyOverview(g, s, p, L);
@@ -1509,187 +1558,6 @@ static std::map<std::string, Bitmap*> g_tiles;
 static std::set<std::string> g_tilePending;
 static std::map<std::string, DWORD> g_tileFailed;
 
-static std::string mapDateKey(int dayOffset) {
-    long long now = (long long)time(nullptr);
-    long long days = now / 86400 - dayOffset;
-    return isoDate(days * 86400);
-}
-
-static std::string tileKey(const std::string& date, int z, int x, int y) {
-    char b[128];
-    snprintf(b, sizeof b, "%s/%d/%d/%d", date.c_str(), z, x, y);
-    return b;
-}
-
-static std::string tileUrl(const std::string& date, int z, int x, int y) {
-    char b[512];
-    snprintf(b, sizeof b,
-             "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_CorrectedReflectance_TrueColor/default/%s/GoogleMapsCompatible_Level9/%d/%d/%d.jpg",
-             date.c_str(), z, x, y);
-    return b;
-}
-
-static std::string coastKey(int z, int x, int y) {
-    char b[64];
-    snprintf(b, sizeof b, "c/%d/%d/%d", z, x, y);
-    return b;
-}
-
-static std::string coastUrl(int z, int x, int y) {
-    char b[512];
-    snprintf(b, sizeof b,
-             "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/Coastlines/default/GoogleMapsCompatible_Level9/%d/%d/%d.png",
-             z, y, x);
-    return b;
-}
-
-static void drawAttribution(Graphics& g, const Pal& p, Rect r) {
-    text(g, L"NASA GIBS · MODIS Terra 真彩影像", font(10.5f, true), r, withAlpha(p.text, 238), 2, 1);
-}
-
-static void drawMap(Graphics& g, AppState& s, const Pal& p, const Layout& L) {
-    Rect r = L.map;
-    shadow(g, r, 24, p);
-    GraphicsPath clip;
-    roundPath(clip, r, 24);
-    g.SetClip(&clip, CombineModeReplace);
-    fillRound(g, r, 24, Color(255, 8, 19, 30));
-    int z = std::max(2, std::min(7, s.mapZoom));
-    double world = 256.0 * (double)(1 << z);
-    double lat = std::max(-82.0, std::min(82.0, s.mapLat));
-    double lon = std::max(-180.0, std::min(180.0, s.mapLon));
-    double lr = lat * M_PI / 180.0;
-    double cxw = (lon + 180.0) / 360.0 * world;
-    double cyw = (1.0 - log(tan(lr) + 1.0 / cos(lr)) / M_PI) / 2.0 * world;
-    double originX = cxw - r.w * 0.5;
-    double originY = cyw - r.h * 0.5;
-    int maxTile = 1 << z;
-    int x0 = (int)floor(originX / 256.0), x1 = (int)floor((originX + r.w) / 256.0);
-    int y0 = (int)floor(originY / 256.0), y1 = (int)floor((originY + r.h) / 256.0);
-    y0 = std::max(0, y0); y1 = std::min(maxTile - 1, y1);
-    std::string date = mapDateKey(s.mapDay);
-    int missing = 0;
-    int requested = 0;
-    for (int ty = y0; ty <= y1; ty++) {
-        for (int tx = x0; tx <= x1; tx++) {
-            int wx = ((tx % maxTile) + maxTile) % maxTile;
-            std::string key = tileKey(date, z, wx, ty);
-            float dx = r.x + (float)(tx * 256.0 - originX);
-            float dy = r.y + (float)(ty * 256.0 - originY);
-            auto it = g_tiles.find(key);
-            if (it != g_tiles.end()) {
-                g.SetInterpolationMode(InterpolationModeHighQualityBicubic);
-                g.DrawImage(it->second, RectF(dx, dy, 256, 256), 0, 0, 256, 256, UnitPixel);
-            } else {
-                missing++;
-                fillRound(g, { dx, dy, 256, 256 }, 0, Color(255, 11, 25, 38));
-                line(g, dx, dy, dx + 256, dy, Color(16, 90, 130, 160), 1.0f);
-                line(g, dx, dy, dx, dy + 256, Color(16, 90, 130, 160), 1.0f);
-                bool failed = false;
-                auto fi = g_tileFailed.find(key);
-                if (fi != g_tileFailed.end() && GetTickCount64() - fi->second < 60000) failed = true;
-                if (!failed && !g_tilePending.count(key) && requested < 16) {
-                    g_tilePending.insert(key);
-                    appEnqueueTile(s, key, tileUrl(date, z, wx, ty));
-                    requested++;
-                }
-            }
-            // Coastlines make the true-colour image readable even when clouds are dense.
-            std::string ck = coastKey(z, wx, ty);
-            auto ci = g_tiles.find(ck);
-            if (ci != g_tiles.end()) {
-                g.DrawImage(ci->second, RectF(dx, dy, 256, 256), 0, 0, 256, 256, UnitPixel);
-            } else {
-                auto fi = g_tileFailed.find(ck);
-                bool failed = (fi != g_tileFailed.end() && GetTickCount64() - fi->second < 60000);
-                if (!failed && !g_tilePending.count(ck) && requested < 18) {
-                    g_tilePending.insert(ck);
-                    appEnqueueTile(s, ck, coastUrl(z, wx, ty));
-                    requested++;
-                }
-            }
-        }
-    }
-    // cool tint so the cloud field sits comfortably in the hero
-    SolidBrush mapTint(Color(38, 4, 14, 30));
-    g.FillRectangle(&mapTint, RectF(r.x, r.y, r.w, r.h));
-    LinearGradientBrush topShade(PointF(0, r.y), PointF(0, r.y + 190), Color(205, 3, 10, 20), Color(0, 3, 10, 20));
-    g.FillRectangle(&topShade, RectF(r.x, r.y, r.w, 190));
-    LinearGradientBrush botShade(PointF(0, r.bottom() - 130), PointF(0, r.bottom()), Color(0, 3, 10, 20), Color(180, 3, 10, 20));
-    g.FillRectangle(&botShade, RectF(r.x, r.bottom() - 130, r.w, 130));
-
-    // marker
-    double locX = (s.weather.loc.lon + 180.0) / 360.0 * world;
-    double locY = (1.0 - log(tan(s.weather.loc.lat * M_PI / 180.0) + 1.0 / cos(s.weather.loc.lat * M_PI / 180.0)) / M_PI) / 2.0 * world;
-    float sx = r.x + (float)(locX - originX);
-    float sy = r.y + (float)(locY - originY);
-    if (s.hasWeather && sx > r.x + 10 && sx < r.right() - 10 && sy > r.y + 40 && sy < r.bottom() - 20) {
-        float pulse = 11 + 4 * sinf((float)s.animTime * 2.2f);
-        ellipse(g, sx - pulse, sy - pulse, pulse * 2, pulse * 2, Color(45, 96, 221, 255));
-        ellipse(g, sx - 6, sy - 6, 12, 12, Color(255, 255, 255, 255));
-        ellipse(g, sx - 3, sy - 3, 6, 6, p.accent);
-        Rect label = { sx + 16, sy - 28, 170, 48 };
-        if (label.right() > r.right() - 16) label.x = sx - 186;
-        fillRound(g, label, 12, Color(222, 6, 16, 29));
-        strokeRound(g, label, 12, Color(70, 255, 255, 255));
-        text(g, widen(s.weather.loc.name), font(12.5f, true), { label.x + 12, label.y + 5, label.w - 24, 19 }, Color(255, 255, 255, 255));
-        text(g, tempText(s.weather.now.temp, s.settings.celsius, false) + L" · " + condName(s.weather.now.cond),
-             font(9.5f), { label.x + 12, label.y + 25, label.w - 24, 17 }, Color(230, 248, 252, 255));
-    }
-
-    g.ResetClip();
-
-    // title & controls (unclipped)
-    Rect titleBg = { r.x + 16, r.y + 12, 320, 78 };
-    fillRound(g, titleBg, 16, Color(200, 4, 13, 24));
-    strokeRound(g, titleBg, 16, Color(52, 255, 255, 255));
-    text(g, L"卫星云图", font(21, true), { r.x + 28, r.y + 19, 250, 31 }, Color(255, 255, 255, 255));
-    text(g, L"NASA MODIS Terra · 真彩卫星影像", font(10.5f), { r.x + 28, r.y + 47, 290, 17 }, Color(218, 230, 244, 255));
-    Rect nav = { r.x + 22, r.y + 92, 204, 34 };
-    fillRound(g, nav, 12, Color(180, 5, 14, 26));
-    strokeRound(g, nav, 12, Color(55, 255, 255, 255));
-    bool ph = L.mapPrev.has(s.mouseX, s.mouseY), nh = L.mapNext.has(s.mouseX, s.mouseY);
-    if (ph) fillRound(g, L.mapPrev, 8, Color(35, 255, 255, 255));
-    if (nh) fillRound(g, L.mapNext, 8, Color(35, 255, 255, 255));
-    mini(g, MI_LEFT, L.mapPrev.inset(8), Color(235, 245, 255, 255), 1.6f);
-    mini(g, MI_RIGHT, L.mapNext.inset(7), Color(235, 245, 255, 255), 1.6f);
-    text(g, mapDateLabel(s.mapDay), font(11.5f, true), L.mapDate, Color(255, 255, 255, 255), 1, 1);
-
-    // info
-    panel(g, s, p, L.mapInfo, 16, 0);
-    std::wstring mapCity = s.hasWeather ? widen(s.weather.loc.name)
-                          : (s.settings.hasCurrent ? widen(s.settings.current.name) : L"当前位置");
-    text(g, L"云图信息", font(10.5f, true), { L.mapInfo.x + 14, L.mapInfo.y + 9, 150, 18 }, p.sub);
-    text(g, mapCity, font(16, true), { L.mapInfo.x + 14, L.mapInfo.y + 29, L.mapInfo.w - 28, 25 }, p.text);
-    text(g, s.hasWeather ? (L"云量 " + zeroDecimal(s.weather.now.cloud) + L"%  ·  " + condName(s.weather.now.cond))
-                         : std::wstring(L"正在获取天气…"),
-         font(10.5f), { L.mapInfo.x + 14, L.mapInfo.y + 59, L.mapInfo.w - 28, 18 }, p.sub);
-    text(g, L"海岸线叠加 · 云层呈白色", font(9.5f), { L.mapInfo.x + 14, L.mapInfo.y + 80, L.mapInfo.w - 28, 16 }, p.faint);
-
-    // zoom
-    auto zbtn = [&](Rect rr, int icon) {
-        bool hov = rr.has(s.mouseX, s.mouseY);
-        fillRound(g, rr, 9, hov ? Color(210, 25, 42, 60) : Color(170, 5, 14, 26));
-        strokeRound(g, rr, 9, Color(45, 255, 255, 255));
-        mini(g, icon, rr.inset(8), Color(240, 248, 255, 255), 1.5f);
-    };
-    zbtn(L.mapZoomIn, MI_PLUS);
-    zbtn(L.mapZoomOut, MI_MIN);
-    zbtn(L.mapReset, MI_REFRESH);
-
-    if (missing > 0) {
-        spinner(g, r.right() - 32, r.bottom() - 28, 7, s.animTime, Color(255, 255, 255, 255));
-        text(g, L"载入影像…", font(9.5f), { r.right() - 180, r.bottom() - 37, 140, 17 }, Color(230, 242, 255, 255), 2);
-    }
-    drawAttribution(g, p, { r.x + 24, r.bottom() - 27, 320, 17 });
-    text(g, wfmt(L"%.2f°, %.2f°", s.mapLat, s.mapLon), font(10.5f),
-         { r.right() - 260, r.bottom() - 28, 220, 18 }, Color(238, 247, 255, 255), 2);
-}
-
-} // namespace
-
-namespace {
-
 static void drawToggle(Graphics& g, const Pal& p, Rect r, bool on) {
     fillRound(g, r, r.h * 0.5f, on ? withAlpha(p.accent, 220)
                                    : (p.dark ? Color(38, 255, 255, 255) : Color(210, 221, 234)));
@@ -1697,6 +1565,53 @@ static void drawToggle(Graphics& g, const Pal& p, Rect r, bool on) {
     float kx = on ? r.right() - knob - 3 : r.x + 3;
     ellipse(g, kx, r.y + 3, knob, knob, Color(255, 255, 255, 255));
     if (on) ellipse(g, kx + knob * 0.30f, r.y + 3 + knob * 0.30f, knob * 0.4f, knob * 0.4f, withAlpha(p.accent, 90));
+}
+
+static std::vector<int> versionParts(const std::string& tag) {
+    std::vector<int> v;
+    std::string cur;
+    for (char ch : tag) {
+        if (ch >= '0' && ch <= '9') cur += ch;
+        else if (!cur.empty()) { v.push_back(atoi(cur.c_str())); cur.clear(); }
+    }
+    if (!cur.empty()) v.push_back(atoi(cur.c_str()));
+    while (v.size() < 3) v.push_back(0);
+    return v;
+}
+
+static void checkForUpdates() {
+    static std::atomic<bool> checking(false);
+    if (checking.exchange(true)) return;
+    std::thread([]() {
+        const char* urls[] = {
+            "https://api.github.com/repos/Vertex-Wu/AuraWeather/releases/latest",
+            "https://ghproxy.net/https://api.github.com/repos/Vertex-Wu/AuraWeather/releases/latest",
+            "https://ghfast.top/https://api.github.com/repos/Vertex-Wu/AuraWeather/releases/latest"
+        };
+        std::string tag, page;
+        for (const char* url : urls) {
+            std::string err;
+            if (fetchLatestRelease(url, tag, page, err)) break;
+        }
+        checking = false;
+        if (tag.empty()) {
+            MessageBoxW(nullptr, L"检查更新失败，请稍后重试。", L"AURA 天气", MB_ICONWARNING | MB_OK);
+            return;
+        }
+        std::vector<int> remote = versionParts(tag);
+        std::vector<int> local = versionParts("2.0.2");
+        bool newer = remote > local;
+        if (!newer) {
+            std::wstring msg = L"当前已是最新版本 v2.0.2。";
+            MessageBoxW(nullptr, msg.c_str(), L"AURA 天气", MB_ICONINFORMATION | MB_OK);
+            return;
+        }
+        std::wstring wtag = widen(tag);
+        std::wstring msg = L"发现新版本 " + wtag + L"！\n即将打开下载页面。";
+        MessageBoxW(nullptr, msg.c_str(), L"AURA 天气", MB_ICONINFORMATION | MB_OK);
+        std::wstring url = page.empty() ? L"https://github.com/Vertex-Wu/AuraWeather/releases/latest" : widen(page);
+        ShellExecuteW(nullptr, L"open", url.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+    }).detach();
 }
 
 static void drawSettings(Graphics& g, AppState& s, const Pal& p, const Layout& L) {
@@ -1758,9 +1673,9 @@ static void drawSettings(Graphics& g, AppState& s, const Pal& p, const Layout& L
 
     line(g, d.x + 28, d.y + 494, d.right() - 28, d.y + 494, p.dark ? Color(22, 255, 255, 255) : Color(230, 236, 245), 1.0f);
     text(g, L"数据来源", font(9.5f, true), { d.x + 28, d.y + 504, 100, 15 }, p.faint);
-    text(g, L"MET Norway 逐小时预报 · Open-Meteo 城市搜索 · NASA GIBS 卫星影像", font(9.5f),
+    text(g, L"MET Norway 逐小时预报 · Open-Meteo 城市搜索 · Open-Meteo 空气质量", font(9.5f),
          { d.x + 28, d.y + 521, d.w - 56, 15 }, p.sub);
-    text(g, L"所有数据来自公开服务，应用仅在本机缓存天气与云图，不上传个人数据。", font(9.5f),
+    text(g, L"所有数据来自公开服务，应用仅在本机缓存天气数据，不上传个人数据。", font(9.5f),
          { d.x + 28, d.y + 538, d.w - 56, 15 }, p.faint);
 
     Rect cb = L.clearBtn;
@@ -1769,7 +1684,13 @@ static void drawSettings(Graphics& g, AppState& s, const Pal& p, const Layout& L
     strokeRound(g, cb, 10, p.dark ? Color(35, 255, 255, 255) : Color(218, 228, 240));
     mini(g, MI_TRASH, { cb.x + 11, cb.y + 9, 16, 16 }, cbh ? p.text : p.sub, 1.4f);
     text(g, L"清除天气缓存", font(10.5f, true), { cb.x + 34, cb.y, cb.w - 40, cb.h }, cbh ? p.text : p.sub, 0, 1);
-    text(g, L"AURA Weather 1.0.0", font(9.5f), { d.right() - 194, cb.y + 7, 166, 17 }, p.faint, 2, 1);
+    Rect ub = L.updateBtn;
+    bool ubh = ub.has(s.mouseX, s.mouseY);
+    fillRound(g, ub, 10, ubh ? (p.dark ? Color(28, 255, 255, 255) : Color(238, 244, 253)) : Color(0, 0, 0, 0));
+    strokeRound(g, ub, 10, p.dark ? Color(35, 255, 255, 255) : Color(218, 228, 240));
+    mini(g, MI_REFRESH, { ub.x + 11, ub.y + 9, 16, 16 }, ubh ? p.text : p.sub, 1.4f);
+    text(g, L"检查更新", font(10.5f, true), { ub.x + 34, ub.y, ub.w - 40, ub.h }, ubh ? p.text : p.sub, 0, 1);
+    text(g, L"AURA Weather 2.0.2", font(9.5f), { d.right() - 174, cb.y + 7, 150, 17 }, p.faint, 2, 1);
 }
 
 static void drawSearch(Graphics& g, AppState& s, const Pal& p, const Layout& L) {
@@ -1816,59 +1737,104 @@ static void drawToast(Graphics& g, const AppState& s, const Pal& p) {
     text(g, s.toast, font(11.5f, true), { r.x + 42, r.y, r.w - 56, r.h }, Color((BYTE)alpha, 255, 255, 255), 0, 1);
 }
 
-static void buildAdvice(AppState& s) {
-    s.advice.clear();
-    if (!s.hasWeather) return;
-    const WeatherData& w = s.weather;
-    double rain = 0, maxWind = w.now.wind, maxUv = w.now.uv, swing = 0;
-    for (size_t i = 0; i < w.hours.size() && i < 12; i++) {
-        rain += std::max(0.0, w.hours[i].precip);
-        maxWind = std::max(maxWind, w.hours[i].wind);
-        maxUv = std::max(maxUv, w.hours[i].uv);
+static void drawSunrisePage(Graphics& g, AppState& s, const Pal& p, const Layout& L) {
+    Rect r = L.content;
+    panel(g, s, p, r, 22, 0);
+    text(g, L"今日太阳轨迹", font(16, true), { r.x + 24, r.y + 14, 220, 24 }, p.text);
+    text(g, L"未来 10 天日出与日落", font(10.5f), { r.right() - 220, r.y + 18, 196, 18 }, p.faint, 2);
+    if (!s.hasWeather || s.weather.days.empty()) {
+        text(g, L"正在获取日出日落数据…", font(12), { r.x, r.cy(), r.w, 24 }, p.sub, 1, 1);
+        return;
     }
-    if (!w.days.empty()) {
-        rain = std::max(rain, w.days[0].precip);
-        maxWind = std::max(maxWind, w.days[0].windMax);
-        maxUv = std::max(maxUv, w.days[0].uvMax);
-        swing = w.days[0].tmax - w.days[0].tmin;
+    Rect arcR = { r.cx() - 330, r.y + 58, 660, 190 };
+    drawSunArc(g, s, p, arcR);
+    float headY = r.y + 300;
+    float dateW = r.w * 0.42f, riseW = r.w * 0.29f;
+    text(g, L"日期", font(10.5f, true), { r.x + 40, headY, dateW, 18 }, p.sub);
+    text(g, L"日出", font(10.5f, true), { r.x + 40 + dateW, headY, riseW, 18 }, p.sub);
+    text(g, L"日落", font(10.5f, true), { r.x + 40 + dateW + riseW, headY, riseW, 18 }, p.sub);
+    line(g, r.x + 32, headY + 22, r.right() - 32, headY + 22, p.border, 1.0f);
+    int n = std::min(10, (int)s.weather.days.size());
+    float rowH = (r.bottom() - headY - 34) / 10.0f;
+    for (int i = 0; i < n; i++) {
+        const DayItem& d = s.weather.days[i];
+        float y = headY + 30 + i * rowH;
+        CivilTime ct = civilLocal(d.utcMidnight, locationOffset(s));
+        std::wstring label = i == 0 ? L"今天" : (i == 1 ? L"明天" : weekdayCN(ct.wd));
+        text(g, label, font(11.5f, i == 0), { r.x + 40, y, 90, rowH }, p.text, 0, 1);
+        std::wstring date = wfmt(L"%02d/%02d", d.m, d.d);
+        text(g, date, font(10.5f), { r.x + 132, y, 80, rowH }, p.faint, 0, 1);
+        text(g, widen(d.sunrise.empty() ? "—" : d.sunrise), font(12, true),
+             { r.x + 40 + dateW, y, riseW, rowH }, p.text, 0, 1);
+        text(g, widen(d.sunset.empty() ? "—" : d.sunset), font(12, true),
+             { r.x + 40 + dateW + riseW, y, riseW, rowH }, p.text, 0, 1);
+        if (i < n - 1) line(g, r.x + 32, y + rowH, r.right() - 32, y + rowH,
+                            p.dark ? Color(18, 255, 255, 255) : Color(234, 240, 248), 1.0f);
     }
-    auto add = [&](const wchar_t* icon, const wchar_t* text) {
-        s.advice.push_back({ icon, text });
-    };
-    if (rain >= 0.2) add(L"\uE9D2", L"出门记得带伞");
-    if (maxWind >= 10.8) add(L"\uE9CA", L"风力较大注意防风");
-    if (w.aqi > 100) add(L"\uEA48", L"空气质量差戴口罩");
-    if (swing >= 10) add(L"\uE9CA", L"早晚温差大注意添衣");
-    if (maxUv >= 5) add(L"\uE706", L"紫外线较强注意防晒");
-    if (w.visibilityKm < 1.0) add(L"\uE7BA", L"能见度低注意安全");
-    if (s.advice.empty()) add(L"\uE753", L"天气适宜，适合出行");
+}
+
+static void drawBigMoon(Graphics& g, Rect r, int idx, const Pal& p) {
+    float R = std::min(r.w, r.h) * 0.46f;
+    float cx = r.cx(), cy = r.cy();
+    LinearGradientBrush base(PointF(cx - R, cy - R), PointF(cx + R, cy + R),
+                             Color(255, 255, 252, 231), Color(255, 205, 218, 239));
+    g.FillEllipse(&base, cx - R, cy - R, R * 2, R * 2);
+    Color crater(90, 145, 164, 195);
+    ellipse(g, cx - R * 0.52f, cy - R * 0.42f, R * 0.20f, R * 0.15f, crater);
+    ellipse(g, cx + R * 0.16f, cy + R * 0.10f, R * 0.26f, R * 0.20f, crater);
+    ellipse(g, cx - R * 0.18f, cy + R * 0.44f, R * 0.15f, R * 0.12f, crater);
+    ellipse(g, cx + R * 0.42f, cy - R * 0.34f, R * 0.10f, R * 0.10f, crater);
+    static const float dx[8] = { 0.0f, -0.55f, -1.0f, -1.55f, 0.0f, 1.55f, 1.0f, 0.55f };
+    if (idx == 0) {
+        SolidBrush dark(Color(255, 18, 28, 42));
+        g.FillEllipse(&dark, cx - R, cy - R, R * 2, R * 2);
+    } else if (idx != 4) {
+        GraphicsPath clip;
+        clip.AddEllipse(cx - R, cy - R, R * 2, R * 2);
+        g.SetClip(&clip, CombineModeReplace);
+        SolidBrush shadow(Color(245, 17, 27, 41));
+        float off = dx[idx] * R;
+        g.FillEllipse(&shadow, cx - R + off, cy - R, R * 2, R * 2);
+        g.ResetClip();
+    }
+    Pen pen(withAlpha(p.faint, 120), 1.2f);
+    g.DrawEllipse(&pen, cx - R, cy - R, R * 2, R * 2);
+}
+
+static void drawMoonPage(Graphics& g, AppState& s, const Pal& p, const Layout& L) {
+    Rect r = L.content;
+    panel(g, s, p, r, 22, 0);
+    text(g, L"当前月相", font(16, true), { r.x + 24, r.y + 14, 220, 24 }, p.text);
+    if (!s.hasWeather || s.weather.days.empty()) {
+        text(g, L"正在获取月相数据…", font(12), { r.x, r.cy(), r.w, 24 }, p.sub, 1, 1);
+        return;
+    }
+    int idx = s.weather.moonPhaseIndex;
+    float size = std::min(r.h * 0.54f, 330.0f);
+    float groupH = size + 112;
+    float top = r.y + (r.h - groupH) * 0.5f;
+    Rect moon = { r.cx() - size * 0.5f, top, size, size };
+    drawBigMoon(g, moon, idx, p);
+    static const wchar_t* names[8] = { L"新月", L"娥眉月", L"上弦月", L"盈凸月",
+                                       L"满月", L"亏凸月", L"下弦月", L"残月" };
+    text(g, std::wstring(L"当前月相：") + names[idx & 7], font(22, true),
+         { r.cx() - 250, moon.bottom() + 22, 500, 34 }, p.text, 1);
+    text(g, L"月相数据由 MET Norway 提供 · 北半球视角", font(10.5f),
+         { r.cx() - 250, moon.bottom() + 64, 500, 20 }, p.faint, 1);
 }
 
 static void drawAdvice(Graphics& g, AppState& s, const Pal& p, const Layout& L) {
-    buildAdvice(s);
-    if (s.advice.empty()) return;
+    if (!s.hasWeather || s.weather.advices.empty()) return;
+    std::string joined;
+    for (size_t i = 0; i < s.weather.advices.size(); i++) {
+        if (i) joined += " | ";
+        joined += s.weather.advices[i];
+    }
     fillRound(g, { L.advice.x - 14, L.advice.y - 4, L.advice.w + 28, 27 }, 13,
               p.dark ? Color(255, 18, 29, 43) : Color(255, 255, 255, 255));
     strokeRound(g, { L.advice.x - 14, L.advice.y - 4, L.advice.w + 28, 27 }, 13, p.border);
-    Font* iconFont = font(12, false, 3);
-    Font* textFont = font(11.0f);
-    float x = L.advice.x;
-    float right = L.advice.right();
-    for (size_t i = 0; i < s.advice.size(); i++) {
-        if (i) {
-            text(g, L" | ", textFont, { x, L.advice.y, 20, L.advice.h }, p.faint, 0, 1);
-            x += 16;
-        }
-        if (x > right - 20) break;
-        text(g, s.advice[i].icon, iconFont, { x, L.advice.y - 1, 17, L.advice.h }, p.accent, 0, 1);
-        x += 16;
-        float w = tw(g, s.advice[i].text, textFont);
-        if (x + w > right) w = std::max(0.0f, right - x);
-        text(g, s.advice[i].text, textFont, { x, L.advice.y, w, L.advice.h }, p.text, 0, 1);
-        x += w + 8;
-    }
+    text(g, widen(joined), font(11.0f), { L.advice.x, L.advice.y, L.advice.w, L.advice.h }, p.text, 0, 1);
 }
-
 static void drawAll(Graphics& g, AppState& s) {
     Pal p = palette(s);
     ensureStaticBackground(s, p, g_backW, g_backH);
@@ -1879,14 +1845,11 @@ static void drawAll(Graphics& g, AppState& s) {
     Layout L = layout(s);
     drawTopBar(g, s, p, L);
     drawTabs(g, s, p, L);
-    if (!s.mapUserMoved && s.hasWeather) {
-        s.mapLat = s.weather.loc.lat;
-        s.mapLon = s.weather.loc.lon;
-    }
     if (s.page == 0) drawOverview(g, s, p, L);
     else if (s.page == 1) drawHourlyPage(g, s, p, L);
     else if (s.page == 2) drawTenDay(g, s, p, L);
-    else drawMap(g, s, p, L);
+    else if (s.page == 3) drawSunrisePage(g, s, p, L);
+    else drawMoonPage(g, s, p, L);
     drawAdvice(g, s, p, L);
     if (s.searchOpen) drawSearch(g, s, p, L);
     drawToast(g, s, p);
@@ -1906,10 +1869,6 @@ static int getEncoderClsid(const WCHAR* format, CLSID* pClsid) {
     return -1;
 }
 
-static bool mapHit(const AppState& s, const Layout& L, float x, float y) {
-    return s.page == 3 && L.map.has(x, y) && !L.mapInfo.has(x, y) && !L.mapPrev.has(x, y)
-        && !L.mapNext.has(x, y) && !L.mapZoomIn.has(x, y) && !L.mapZoomOut.has(x, y) && !L.mapReset.has(x, y);
-}
 
 // A compact hash of what the pointer is currently hovering. Moving inside the
 // same card must not trigger a whole-window repaint; only crossing into another
@@ -1927,6 +1886,7 @@ static int hoverSignature(const AppState& s) {
         if (L.unitF.has(x, y)) return 6;
         for (int i = 0; i < 5; i++) if (L.toggles[i].has(x, y)) return 10 + i;
         if (L.clearBtn.has(x, y)) return 20;
+        if (L.updateBtn.has(x, y)) return 21;
         return 0;
     }
     if (s.searchOpen && !L.searchCard.empty() && L.searchCard.has(x, y)) {
@@ -1939,7 +1899,7 @@ static int hoverSignature(const AppState& s) {
     if (L.themeBtn.has(x, y)) return 43;
     if (L.settingsBtn.has(x, y)) return 44;
     if (L.search.has(x, y)) return 45;
-    for (int i = 0; i < 4; i++) if (L.tabs[i].has(x, y)) return 50 + i;
+    for (int i = 0; i < 5; i++) if (L.tabs[i].has(x, y)) return 50 + i;
     if (L.autoItem.has(x, y)) return 60;
     int start = std::max(0, std::min((int)s.settings.saved.size() - L.cityCount, s.sidebarScroll));
     for (int i = 0; i < L.cityCount; i++) {
@@ -1972,14 +1932,6 @@ static int hoverSignature(const AppState& s) {
         if (L.details.has(x, y)) return 150;
     } else if (s.page == 2) {
         for (int i = 0; i < 10; i++) if (L.tenRow[i].has(x, y)) return 300 + i;
-    } else if (s.page == 3) {
-        if (L.mapPrev.has(x, y)) return 400;
-        if (L.mapNext.has(x, y)) return 401;
-        if (L.mapZoomIn.has(x, y)) return 402;
-        if (L.mapZoomOut.has(x, y)) return 403;
-        if (L.mapReset.has(x, y)) return 404;
-        if (L.mapInfo.has(x, y)) return 405;
-        if (L.map.has(x, y)) return 410;
     }
     return 0;
 }
@@ -2117,27 +2069,6 @@ bool mouseMove(AppState& s, float x, float y) {
                      SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
         return true;
     }
-    if (s.mapDragging) {
-        int z = std::max(2, std::min(7, s.mapZoom));
-        double world = 256.0 * (double)(1 << z);
-        double cx = (s.mapDragLon + 180.0) / 360.0 * world;
-        double lr = s.mapDragLat * M_PI / 180.0;
-        double cy = (1.0 - log(tan(lr) + 1.0 / cos(lr)) / M_PI) / 2.0 * world;
-        cx -= (x - s.mapDragX);
-        cy -= (y - s.mapDragY);
-        cx = std::max(0.0, std::min(world, cx));
-        cy = std::max(0.0, std::min(world, cy));
-        s.mapLon = cx / world * 360.0 - 180.0;
-        s.mapLat = atan(sinh(M_PI * (1.0 - 2.0 * cy / world))) * 180.0 / M_PI;
-        s.mapLat = std::max(-82.0, std::min(82.0, s.mapLat));
-        s.mapUserMoved = true;
-        DWORD now = (DWORD)GetTickCount64();
-        if (now - s.lastMapPaint >= 33) {
-            s.lastMapPaint = now;
-            InvalidateRect(s.hwnd, nullptr, FALSE);
-        }
-        return true;
-    }
     return true;
 }
 
@@ -2166,6 +2097,7 @@ bool mouseDown(AppState& s, float x, float y) {
             }
         }
         if (L.clearBtn.has(x, y)) { appClearCache(s); return true; }
+        if (L.updateBtn.has(x, y)) { checkForUpdates(); return true; }
         return true;
     }
 
@@ -2191,7 +2123,7 @@ bool mouseDown(AppState& s, float x, float y) {
         InvalidateRect(s.hwnd, nullptr, FALSE);
         return true;
     }
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 5; i++) {
         if (L.tabs[i].has(x, y)) {
             if (s.page != i) { s.page = i; InvalidateRect(s.hwnd, nullptr, FALSE); }
             return true;
@@ -2232,23 +2164,6 @@ bool mouseDown(AppState& s, float x, float y) {
         if (s.hasWeather && L.weekly.has(x, y)) {
             if (L.showTen.has(x, y) || y > L.weekly.y + 32) { s.page = 2; InvalidateRect(s.hwnd, nullptr, FALSE); return true; }
         }
-    } else if (s.page == 3) {
-        if (L.mapPrev.has(x, y)) { s.mapDay = std::min(6, s.mapDay + 1); InvalidateRect(s.hwnd, nullptr, FALSE); return true; }
-        if (L.mapNext.has(x, y)) { s.mapDay = std::max(0, s.mapDay - 1); InvalidateRect(s.hwnd, nullptr, FALSE); return true; }
-        if (L.mapZoomIn.has(x, y)) { s.mapZoom = std::min(7, s.mapZoom + 1); InvalidateRect(s.hwnd, nullptr, FALSE); return true; }
-        if (L.mapZoomOut.has(x, y)) { s.mapZoom = std::max(2, s.mapZoom - 1); InvalidateRect(s.hwnd, nullptr, FALSE); return true; }
-        if (L.mapReset.has(x, y)) {
-            if (s.hasWeather) { s.mapLat = s.weather.loc.lat; s.mapLon = s.weather.loc.lon; }
-            s.mapZoom = 4; s.mapUserMoved = false;
-            InvalidateRect(s.hwnd, nullptr, FALSE); return true;
-        }
-        if (mapHit(s, L, x, y)) {
-            s.mapDragging = true;
-            s.mapDragX = x; s.mapDragY = y;
-            s.mapDragLat = s.mapLat; s.mapDragLon = s.mapLon;
-            SetCapture(s.hwnd);
-            return true;
-        }
     }
 
     if (y < TOPBAR_H && x > SIDEBAR_W) {
@@ -2264,12 +2179,8 @@ bool mouseDown(AppState& s, float x, float y) {
 
 bool mouseUp(AppState& s, float x, float y) {
     s.mouseX = x; s.mouseY = y;
-    bool was = s.draggingWindow || s.mapDragging;
+    bool was = s.draggingWindow;
     s.draggingWindow = false;
-    if (s.mapDragging) {
-        s.mapDragging = false;
-        s.mapUserMoved = true;
-    }
     s.mouseDown = false;
     if (GetCapture() == s.hwnd) ReleaseCapture();
     if (was) InvalidateRect(s.hwnd, nullptr, FALSE);
@@ -2282,25 +2193,11 @@ bool mouseDoubleClick(AppState& s, float x, float y) {
         ShowWindow(s.hwnd, IsZoomed(s.hwnd) ? SW_RESTORE : SW_MAXIMIZE);
         return true;
     }
-    if (s.page == 3) {
-        Layout L = layout(s);
-        if (mapHit(s, L, x, y)) {
-            if (s.hasWeather) { s.mapLat = s.weather.loc.lat; s.mapLon = s.weather.loc.lon; }
-            s.mapZoom = 4;
-            InvalidateRect(s.hwnd, nullptr, FALSE);
-            return true;
-        }
-    }
     return false;
 }
 
 bool mouseWheel(AppState& s, float x, float y, int delta) {
     Layout L = layout(s);
-    if (s.page == 3 && L.map.has(x, y)) {
-        s.mapZoom = std::max(2, std::min(7, s.mapZoom + (delta > 0 ? 1 : -1)));
-        InvalidateRect(s.hwnd, nullptr, FALSE);
-        return true;
-    }
     if (x < SIDEBAR_W) {
         int maxVisible = std::max(3, std::min(8, (int)((s.H - 340) / 60)));
         int maxScroll = std::max(0, (int)s.settings.saved.size() - maxVisible);
@@ -2318,7 +2215,7 @@ bool keyDown(AppState& s, WPARAM key) {
     }
     if (key == VK_F5) { appRequestWeather(s); return true; }
     if ((GetKeyState(VK_CONTROL) & 0x8000) && (key == 'F')) { appFocusSearch(s); return true; }
-    if (key >= '1' && key <= '4') {
+    if (key >= '1' && key <= '5') {
         s.page = (int)(key - '1');
         InvalidateRect(s.hwnd, nullptr, FALSE);
         return true;
@@ -2332,7 +2229,7 @@ bool interactive(const AppState& s, float x, float y) {
         return L.search.has(x, y) || L.themeBtn.has(x, y) || L.settingsBtn.has(x, y) ||
                L.winMin.has(x, y) || L.winMax.has(x, y) || L.winClose.has(x, y);
     }
-    return x < SIDEBAR_W || y > TABS_Y || s.page == 3;
+    return x < SIDEBAR_W || y > TABS_Y;
 }
 
 COLORREF searchBg(const AppState& s) {
@@ -2343,6 +2240,20 @@ COLORREF searchFg(const AppState& s) {
 }
 
 } // namespace UI
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

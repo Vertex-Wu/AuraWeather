@@ -67,6 +67,8 @@ struct WeatherData {
     double aqi = 0;          // US AQI, 0 = unavailable
     double visibilityKm = 10;
     int moonPhaseIndex = 0;  // 0 new, 1 waxing crescent ... 4 full ... 7 waning crescent
+    std::string alertText;
+    std::vector<std::string> advices;
     std::string provider = "MET Norway";
 };
 

@@ -3,6 +3,7 @@
 #include "json.h"
 
 #include <windows.h>
+#include <winhttp.h>
 #include <shlobj.h>
 #include <filesystem>
 #include <fstream>
@@ -366,6 +367,118 @@ static double fetchAqi(const Location& loc) {
     return (v >= 0 && v < 1000) ? v : 0;
 }
 
+static void buildInsights(WeatherData& w) {
+    w.alertText.clear();
+    w.advices.clear();
+    double tmax = w.now.temp, tmin = w.now.temp, windMax = w.now.wind;
+    double rain = w.now.precip, uvMax = w.now.uv, humidityMin = w.now.humidity;
+    bool thunder = w.now.cond == Cond::Thunder;
+    bool snow = w.now.cond == Cond::Snow || w.now.cond == Cond::Sleet;
+    for (size_t i = 0; i < w.hours.size() && i < 3; i++) {
+        const HourItem& h = w.hours[i];
+        tmax = std::max(tmax, h.temp); tmin = std::min(tmin, h.temp);
+        windMax = std::max(windMax, h.wind);
+        rain += std::max(0.0, h.precip);
+        uvMax = std::max(uvMax, h.uv);
+        humidityMin = std::min(humidityMin, h.humidity);
+        thunder = thunder || h.cond == Cond::Thunder;
+        snow = snow || h.cond == Cond::Snow || h.cond == Cond::Sleet;
+    }
+    double swing = (!w.days.empty()) ? w.days[0].tmax - w.days[0].tmin : 0;
+    std::vector<std::string> alerts;
+    auto addAlert = [&](const char* s) {
+        if (std::find(alerts.begin(), alerts.end(), s) == alerts.end()) alerts.push_back(s);
+    };
+    if (thunder) addAlert("【雷暴预警】强对流天气，注意防雷防触电！");
+    if (tmax >= 37) addAlert("【高温预警】极端炎热，避免室外作业！");
+    if (tmin <= -10) addAlert("【寒潮预警】气温极低，注意水管防冻！");
+    if (windMax > 24.5) addAlert("【狂风预警】极度危险，请留在室内！");
+    else if (windMax > 17.2) addAlert("【大风预警】风力强劲，注意高空坠物！");
+    if (rain > 16) addAlert("【暴雨预警】短时强降水，极易引起积水！");
+    if (tmin < 0 && rain > 5) addAlert("【暴雪预警】道路结冰注意防滑！");
+    if (w.visibilityKm < 0.5) addAlert("【大雾预警】能见度极低，驾车需开雾灯！");
+    if (w.aqi > 200) addAlert("【重度污染预警】空气极差，请紧闭门窗！");
+    if (humidityMin < 20) addAlert("【极度干燥预警】静电高发，注意补水与火险！");
+    for (size_t i = 0; i < alerts.size(); i++) {
+        if (i) w.alertText += "; ";
+        w.alertText += alerts[i];
+    }
+    auto addAdvice = [&](const char* s) {
+        if (std::find(w.advices.begin(), w.advices.end(), s) == w.advices.end()) w.advices.push_back(s);
+    };
+    bool rainy = rain > 0.05 || snow;
+    if (rain > 0.05) addAdvice("出门记得带伞");
+    if (tmin < 10) addAdvice("建议穿厚外套");
+    else if (tmax > 28) addAdvice("天气炎热防暑");
+    if (swing > 10) addAdvice("早晚温差大");
+    if (uvMax > 5) addAdvice("紫外线较强，注意防晒");
+    if (w.aqi > 100) addAdvice("空气质量差，建议戴口罩");
+    if (w.aqi <= 100 && !rainy) addAdvice("适宜户外运动");
+    if (!rainy) addAdvice("适宜洗车");
+}
+
+bool fetchLatestRelease(const std::string& url, std::string& tag, std::string& page, std::string& err) {
+    tag.clear();
+    page.clear();
+    std::wstring wurl(url.begin(), url.end());
+    URL_COMPONENTS uc{};
+    uc.dwStructSize = sizeof(uc);
+    wchar_t host[256] = {}, path[2048] = {};
+    uc.lpszHostName = host; uc.dwHostNameLength = 255;
+    uc.lpszUrlPath = path; uc.dwUrlPathLength = 2047;
+    if (!WinHttpCrackUrl(wurl.c_str(), 0, 0, &uc)) { err = "bad url"; return false; }
+    HINTERNET session = WinHttpOpen(L"AuraWeather", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
+                                    WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
+    if (!session) { err = "winhttp open"; return false; }
+    WinHttpSetTimeouts(session, 8000, 8000, 8000, 12000);
+    HINTERNET connect = WinHttpConnect(session, host, uc.nPort, 0);
+    if (!connect) { WinHttpCloseHandle(session); err = "connect"; return false; }
+    DWORD flags = (uc.nScheme == INTERNET_SCHEME_HTTPS) ? WINHTTP_FLAG_SECURE : 0;
+    HINTERNET request = WinHttpOpenRequest(connect, L"GET", path, nullptr,
+                                           WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES, flags);
+    if (!request) { WinHttpCloseHandle(connect); WinHttpCloseHandle(session); err = "request"; return false; }
+    DWORD policy = WINHTTP_OPTION_REDIRECT_POLICY_ALWAYS;
+    WinHttpSetOption(request, WINHTTP_OPTION_REDIRECT_POLICY, &policy, sizeof(policy));
+    WinHttpAddRequestHeaders(request, L"User-Agent: AuraWeather", (DWORD)-1L,
+                             WINHTTP_ADDREQ_FLAG_ADD | WINHTTP_ADDREQ_FLAG_REPLACE);
+    bool ok = WinHttpSendRequest(request, WINHTTP_NO_ADDITIONAL_HEADERS, 0,
+                                 WINHTTP_NO_REQUEST_DATA, 0, 0, 0) &&
+              WinHttpReceiveResponse(request, nullptr);
+    DWORD status = 0, sz = sizeof(status);
+    if (ok) WinHttpQueryHeaders(request, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
+                                WINHTTP_HEADER_NAME_BY_INDEX, &status, &sz, WINHTTP_NO_HEADER_INDEX);
+    std::string body;
+    if (ok && status == 200) {
+        DWORD avail = 0;
+        do {
+            avail = 0;
+            if (!WinHttpQueryDataAvailable(request, &avail)) break;
+            if (!avail) break;
+            std::string chunk(avail, '\0');
+            DWORD read = 0;
+            if (!WinHttpReadData(request, chunk.data(), avail, &read) || !read) break;
+            chunk.resize(read);
+            body += chunk;
+        } while (avail > 0);
+    }
+    WinHttpCloseHandle(request);
+    WinHttpCloseHandle(connect);
+    WinHttpCloseHandle(session);
+    if (status != 200 || body.empty()) {
+        err = "http " + std::to_string(status);
+        return false;
+    }
+    std::string perr;
+    JsonValue root = JsonParser::parse(body, &perr);
+    const JsonValue* t = root.get("tag_name");
+    const JsonValue* h = root.get("html_url");
+    if (t) tag = t->string("");
+    if (h) page = h->string("");
+    while (!tag.empty() && (tag.front() == 'v' || tag.front() == 'V' || tag.front() == ' ')) tag.erase(tag.begin());
+    if (tag.empty()) { err = "no tag"; return false; }
+    return true;
+}
+
 bool fetchWeather(const Location& loc, WeatherData& out, std::string& err) {
     char url[512];
     snprintf(url, sizeof url,
@@ -390,6 +503,7 @@ bool fetchWeather(const Location& loc, WeatherData& out, std::string& err) {
                 int idx = (int)std::floor(w.days[0].moonPhase * 8.0 + 0.5);
                 w.moonPhaseIndex = ((idx % 8) + 8) % 8;
             }
+            buildInsights(w);
             out = std::move(w);
             err.clear();
             return true;
@@ -406,6 +520,7 @@ bool fetchWeather(const Location& loc, WeatherData& out, std::string& err) {
                 int idx = (int)std::floor(w.days[0].moonPhase * 8.0 + 0.5);
                 w.moonPhaseIndex = ((idx % 8) + 8) % 8;
             }
+            buildInsights(w);
             out = std::move(w);
             err = r.error.empty() ? "网络不可用，显示上次缓存" : ("网络不可用（" + r.error + "），显示上次缓存");
             return true;
@@ -429,6 +544,7 @@ bool loadCachedWeather(const Location& loc, WeatherData& out, std::string& err) 
         int idx = (int)std::floor(w.days[0].moonPhase * 8.0 + 0.5);
         w.moonPhaseIndex = ((idx % 8) + 8) % 8;
     }
+    buildInsights(w);
     out = std::move(w);
     return true;
 }

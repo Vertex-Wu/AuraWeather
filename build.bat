@@ -30,7 +30,7 @@ g++.exe -std=c++20 -O2 -mwindows -DUNICODE -D_UNICODE -DWIN32_LEAN_AND_MEAN -DNO
   build\app_res.o -o AuraWeather.exe ^
   -static -static-libgcc -static-libstdc++ ^
   -Wl,-Bstatic -lssl -lcrypto -lz -lstdc++ -lwinpthread ^
-  -lws2_32 -lcrypt32 -ladvapi32 -luserenv -lole32 -luuid -lcomctl32 -lgdiplus -lshlwapi ^
+  -lws2_32 -lwinhttp -lcrypt32 -ladvapi32 -luserenv -lole32 -luuid -lcomctl32 -lgdiplus -lshlwapi ^
   -lshell32 -ldwmapi -luser32 -lgdi32 -lwinmm -limm32 -lversion -lbcrypt
 
 if errorlevel 1 (
