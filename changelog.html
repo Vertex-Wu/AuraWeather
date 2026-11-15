@@ -3,12 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>更新日志 - AuraWeather</title>
+    <title>历史版本 - AuraWeather</title>
     <link rel="icon" type="image/png" href="logo.png">
     <style>
         :root {
             --bg: #050505;
             --text-main: #ffffff;
+            --text-secondary: #a1a1aa;
             --text-muted: #888888;
             --brand-blue: #007aff;
             --brand-purple: #af52de;
@@ -16,19 +17,14 @@
             --glass-border: rgba(255, 255, 255, 0.1);
             --glass-highlight: rgba(255, 255, 255, 0.3);
             --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif;
+            --font-mono: "SF Mono", "Fira Code", monospace;
         }
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-font-smoothing: antialiased; }
         
-        body {
-            background-color: var(--bg); color: var(--text-main);
-            font-family: var(--font-sans); line-height: 1.6; overflow-x: hidden;
-        }
+        body { background-color: var(--bg); color: var(--text-main); font-family: var(--font-sans); line-height: 1.6; overflow-x: hidden; }
+        
         /* 全局噪点与极光 */
-        body::before {
-            content: ""; position: fixed; inset: 0; z-index: 9999; pointer-events: none;
-            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
-            opacity: 0.04;
-        }
+        body::before { content: ""; position: fixed; inset: 0; z-index: 9999; pointer-events: none; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E"); opacity: 0.04; }
         .fluid-bg { position: fixed; inset: 0; z-index: -1; background: radial-gradient(circle at 50% 0%, #111827 0%, #000 70%); }
         .blob { position: absolute; border-radius: 50%; filter: blur(120px); opacity: 0.4; animation: float 20s infinite alternate; }
         .blob-1 { width: 50vw; height: 50vw; background: var(--brand-blue); top: 10vh; left: -20vw; }
@@ -36,11 +32,7 @@
         @keyframes float { 100% { transform: translate(5%, 10%) scale(1.1); } }
 
         /* 导航栏 */
-        nav {
-            position: fixed; top: 0; width: 100%; height: 70px; z-index: 1000;
-            display: flex; justify-content: center; align-items: center;
-            background: rgba(5, 5, 5, 0.5); backdrop-filter: blur(20px); border-bottom: 1px solid var(--glass-border);
-        }
+        nav { position: fixed; top: 0; width: 100%; height: 70px; z-index: 1000; display: flex; justify-content: center; align-items: center; background: rgba(5, 5, 5, 0.5); backdrop-filter: blur(20px); border-bottom: 1px solid var(--glass-border); }
         .nav-inner { width: 100%; max-width: 1200px; padding: 0 24px; display: flex; justify-content: space-between; align-items: center; }
         .brand { display: flex; align-items: center; gap: 12px; font-size: 18px; font-weight: 700; color: #fff; text-decoration: none; }
         .brand img { width: 32px; height: 32px; border-radius: 8px; }
@@ -49,60 +41,43 @@
         .nav-links a:hover, .nav-links a.active { color: #fff; }
 
         /* 头部 */
-        .header { text-align: center; padding: 160px 24px 80px; }
-        .header h1 { font-size: 56px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 16px;
-            background: linear-gradient(180deg, #fff 30%, #888 100%);
-            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-        }
+        .header { text-align: center; padding: 160px 24px 60px; }
+        .header h1 { font-size: 56px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 16px; background: linear-gradient(180deg, #fff 30%, #888 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
         .header p { font-size: 20px; color: var(--text-muted); }
 
-        /* 时间线 */
-        .timeline { max-width: 800px; margin: 0 auto 120px; padding: 0 24px; position: relative; }
-        /* 中央发光贯穿线 */
-        .timeline::before {
-            content: ''; position: absolute; top: 0; left: 40px; bottom: 0; width: 2px;
-            background: linear-gradient(to bottom, var(--brand-blue), var(--brand-purple), transparent);
-            box-shadow: 0 0 15px rgba(0, 122, 255, 0.5);
-        }
+        /* 表格容器 */
+        .table-container { max-width: 1000px; margin: 0 auto 120px; padding: 0 24px; }
+        .glass-panel { background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 24px; padding: 40px; backdrop-filter: blur(20px); box-shadow: inset 0 1px 1px var(--glass-highlight), 0 10px 40px rgba(0,0,0,0.4); overflow-x: auto; }
 
-        .timeline-item { position: relative; padding-left: 80px; margin-bottom: 60px; }
-        /* 节点脉冲光效 */
-        .timeline-item::before {
-            content: ''; position: absolute; left: 33px; top: 10px; width: 16px; height: 16px;
-            background: var(--bg); border: 2px solid var(--brand-blue); border-radius: 50%;
-            box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.2), 0 0 20px var(--brand-blue);
-            transition: all 0.3s;
-        }
-        .timeline-item:hover::before { background: var(--brand-blue); box-shadow: 0 0 0 6px rgba(0,122,255,0.3), 0 0 30px var(--brand-blue); }
-
-        /* 左侧版本号 */
-        .version-tag {
-            position: absolute; left: 0; top: 6px; font-family: "SF Mono", monospace;
-            font-size: 16px; font-weight: 700; color: var(--brand-blue);
-        }
-
-        /* 玻璃卡片 */
-        .glass-card {
-            background: var(--glass-bg); border: 1px solid var(--glass-border);
-            border-radius: 24px; padding: 32px; backdrop-filter: blur(20px);
-            box-shadow: inset 0 1px 1px var(--glass-highlight), 0 10px 30px rgba(0,0,0,0.3);
-            transition: transform 0.3s, border-color 0.3s;
-        }
-        .glass-card:hover { transform: translateY(-2px); border-color: rgba(255,255,255,0.2); }
+        /* 表格样式 */
+        table { width: 100%; border-collapse: collapse; min-width: 700px; }
+        th, td { padding: 20px; text-align: left; border-bottom: 1px solid var(--glass-border); }
+        th { color: var(--text-muted); font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+        td { font-size: 15px; }
+        tr:last-child td { border-bottom: none; }
+        tr:hover { background: rgba(255, 255, 255, 0.02); }
         
-        .glass-card h2 { font-size: 24px; font-weight: 700; color: #fff; margin-bottom: 16px; }
-        .glass-card ul { padding-left: 20px; color: var(--text-muted); font-size: 16px; }
-        .glass-card li { margin-bottom: 12px; }
-        .glass-card li::marker { color: var(--brand-blue); }
+        .version-tag { font-family: "SF Mono", monospace; font-weight: 700; font-size: 18px; color: #fff; }
+        .date-text { color: var(--text-muted); font-size: 14px; font-family: "SF Mono", monospace; }
+        .desc-text { color: var(--text-secondary); }
+
+        /* 下载按钮组 */
+        .download-actions { display: flex; gap: 12px; }
+        .btn-sm { display: inline-flex; align-items: center; justify-content: center; padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; text-decoration: none; transition: all 0.2s; cursor: pointer; }
+        
+        /* 核心修改：高速用实色蓝底，普通用暗色底 */
+        .btn-fast { background: var(--brand-blue); color: #fff; border: 1px solid var(--brand-blue); box-shadow: 0 4px 10px rgba(0, 122, 255, 0.3); }
+        .btn-fast:hover { background: #0066d6; box-shadow: 0 0 15px rgba(0, 122, 255, 0.5); }
+        
+        .btn-normal { background: rgba(255,255,255,0.08); color: #fff; border: 1px solid rgba(255,255,255,0.15); }
+        .btn-normal:hover { background: rgba(255,255,255,0.15); }
 
         @media (max-width: 900px) {
             .nav-links { display: none; }
             .header h1 { font-size: 40px; }
-            .timeline { padding-left: 10px; }
-            .timeline::before { left: 20px; }
-            .timeline-item { padding-left: 50px; }
-            .timeline-item::before { left: 13px; }
-            .version-tag { position: static; display: block; margin-bottom: 12px; }
+            .glass-panel { padding: 20px; }
+            .download-actions { flex-direction: column; }
+            .btn-sm { width: 100%; }
         }
     </style>
 </head>
@@ -115,44 +90,56 @@
             <div class="nav-links">
                 <a href="index.html">首页</a>
                 <a href="docs.html">编译文档</a>
-                <a href="changelog.html" class="active">更新日志</a>
+                <a href="changelog.html" class="active">历史版本</a>
             </div>
         </div>
     </nav>
 
     <header class="header">
-        <h1>版本更新日志</h1>
-        <p>跟踪 AuraWeather 的每一次架构级进化</p>
+        <h1>历史版本下载</h1>
+        <p>获取 AuraWeather 过往版本的安装包</p>
     </header>
 
-    <main class="timeline">
-        <!-- v2.0.5 -->
-        <div class="timeline-item">
-            <div class="version-tag">v2.0.5</div>
-            <div class="glass-card">
-                <h2>视觉重构与本地预警引擎</h2>
-                <ul>
-                    <li>纯本地气象预警引擎，自动触发红字预警横幅</li>
-                    <li>智能生活建议系统精准锁定未来 3 小时数据</li>
-                    <li>沉浸式极简概览，超大天气图标占据视觉中心</li>
-                    <li>新增独立的“日出”与“月相”标签页</li>
-                    <li>优化 Inno Setup 安装程序，支持旧版无感平滑升级</li>
-                </ul>
-            </div>
-        </div>
-
-        <!-- v1.4.0 -->
-        <div class="timeline-item">
-            <div class="version-tag">v1.4.0</div>
-            <div class="glass-card">
-                <h2>初步探索与基础架构成型</h2>
-                <ul>
-                    <li>实现基于 Win32 的基础 UI 渲染与高 DPI 适配</li>
-                    <li>接入 MET Norway 实时气象数据与 Open-Meteo API</li>
-                    <li>实现基础的暗黑/亮色模式适配</li>
-                    <li>启用单文件静态编译策略 (Zero Dependencies)</li>
-                </ul>
-            </div>
+    <main class="table-container">
+        <div class="glass-panel">
+            <table>
+                <thead>
+                    <tr>
+                        <th>版本号</th>
+                        <th>发布日期</th>
+                        <th>更新说明</th>
+                        <th>下载选项 (点击直接下载)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- v2.0.5 最新版 -->
+                    <tr>
+                        <td><span class="version-tag">v2.0.5</span></td>
+                        <td><span class="date-text">2026-11-15</span></td>
+                        <td><span class="desc-text">视觉重构、超大图标、本地赛博预警引擎。</span></td>
+                        <td>
+                            <!-- 高速在第一位，普通在第二位 -->
+                            <div class="download-actions">
+                                <a href="https://ghfast.top/https://github.com/Vertex-Wu/AuraWeather/releases/download/v2.0.5/AuraWeather_Setup_v2.0.5.exe" class="btn-sm btn-fast">高速镜像</a>
+                                <a href="https://github.com/Vertex-Wu/AuraWeather/releases/download/v2.0.5/AuraWeather_Setup_v2.0.5.exe" class="btn-sm btn-normal">GitHub 普通</a>
+                            </div>
+                        </td>
+                    </tr>
+                    
+                    <!-- v1.4.0 历史版 -->
+                    <tr>
+                        <td><span class="version-tag">v1.4.0</span></td>
+                        <td><span class="date-text">2026-11-15</span></td>
+                        <td><span class="desc-text">初步探索，基础架构，标准安装与卸载。</span></td>
+                        <td>
+                            <div class="download-actions">
+                                <a href="https://ghfast.top/https://github.com/Vertex-Wu/AuraWeather/releases/download/v1.4.0/AuraWeather_Setup_v1.4.0.exe" class="btn-sm btn-fast">高速镜像</a>
+                                <a href="https://github.com/Vertex-Wu/AuraWeather/releases/download/v1.4.0/AuraWeather_Setup_v1.4.0.exe" class="btn-sm btn-normal">GitHub 普通</a>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
     </main>
 </body>
