@@ -5,8 +5,8 @@
 1 RT_MANIFEST "app.manifest"
 
 VS_VERSION_INFO VERSIONINFO
-FILEVERSION 1,0,0,0
-PRODUCTVERSION 1,0,0,0
+FILEVERSION 1,4,0,0
+PRODUCTVERSION 1,4,0,0
 FILEFLAGSMASK 0x3fL
 FILEFLAGS 0x0L
 FILEOS 0x40004L
@@ -19,11 +19,11 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "AURA Weather"
             VALUE "FileDescription", "AURA 天气 - 独立天气应用"
-            VALUE "FileVersion", "1.0.0.0"
+            VALUE "FileVersion", "1.4.0.0"
             VALUE "InternalName", "AuraWeather"
             VALUE "OriginalFilename", "AuraWeather.exe"
             VALUE "ProductName", "AURA 天气"
-            VALUE "ProductVersion", "1.0.0.0"
+            VALUE "ProductVersion", "1.4.0.0"
             VALUE "LegalCopyright", "Weather data: MET Norway, Open-Meteo, NASA GIBS"
         END
     END
