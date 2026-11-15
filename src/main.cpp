@@ -893,7 +893,7 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int nCmdShow) {
         wy = work.top + (work.bottom - work.top - (int)(wh * s->dpi)) / 2;
     }
 
-    HWND hwnd = CreateWindowExW(WS_EX_APPWINDOW, L"AuraWeatherMain", L"AURA 天气 2.0.2",
+    HWND hwnd = CreateWindowExW(WS_EX_APPWINDOW, L"AuraWeatherMain", L"AURA 天气 2.0.5",
                                 WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN,
                                 wx, wy, (int)std::lround(ww * s->dpi), (int)std::lround(wh * s->dpi),
                                 nullptr, nullptr, hInst, nullptr);
@@ -967,6 +967,7 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int nCmdShow) {
     CoUninitialize();
     return (int)msg.wParam;
 }
+
 
 
 

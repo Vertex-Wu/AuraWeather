@@ -1,4 +1,4 @@
-#include "ui.h"
+﻿#include "ui.h"
 #include "app.h"
 #include "services.h"
 #include "settings.h"
@@ -1599,10 +1599,10 @@ static void checkForUpdates() {
             return;
         }
         std::vector<int> remote = versionParts(tag);
-        std::vector<int> local = versionParts("2.0.2");
+        std::vector<int> local = versionParts("2.0.5");
         bool newer = remote > local;
         if (!newer) {
-            std::wstring msg = L"当前已是最新版本 v2.0.2。";
+            std::wstring msg = L"当前已是最新版本 v2.0.5。";
             MessageBoxW(nullptr, msg.c_str(), L"AURA 天气", MB_ICONINFORMATION | MB_OK);
             return;
         }
@@ -1690,7 +1690,7 @@ static void drawSettings(Graphics& g, AppState& s, const Pal& p, const Layout& L
     strokeRound(g, ub, 10, p.dark ? Color(35, 255, 255, 255) : Color(218, 228, 240));
     mini(g, MI_REFRESH, { ub.x + 11, ub.y + 9, 16, 16 }, ubh ? p.text : p.sub, 1.4f);
     text(g, L"检查更新", font(10.5f, true), { ub.x + 34, ub.y, ub.w - 40, ub.h }, ubh ? p.text : p.sub, 0, 1);
-    text(g, L"AURA Weather 2.0.2", font(9.5f), { d.right() - 174, cb.y + 7, 150, 17 }, p.faint, 2, 1);
+    text(g, L"AURA Weather 2.0.5", font(9.5f), { d.right() - 174, cb.y + 7, 150, 17 }, p.faint, 2, 1);
 }
 
 static void drawSearch(Graphics& g, AppState& s, const Pal& p, const Layout& L) {
@@ -2240,6 +2240,7 @@ COLORREF searchFg(const AppState& s) {
 }
 
 } // namespace UI
+
 
 
 
