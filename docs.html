@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>编译文档 - AuraWeather</title>
+    <link rel="icon" type="image/png" href="logo.png">
+    <style>
+        :root {
+            --bg: #050505;
+            --text-main: #ffffff;
+            --text-muted: #888888;
+            --brand-blue: #007aff;
+            --brand-purple: #af52de;
+            --glass-bg: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --glass-highlight: rgba(255, 255, 255, 0.3);
+            --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif;
+            --font-mono: "SF Mono", "Fira Code", monospace;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-font-smoothing: antialiased; }
+        
+        body {
+            background-color: var(--bg); color: var(--text-main);
+            font-family: var(--font-sans); line-height: 1.6; overflow-x: hidden;
+        }
+        /* 全局噪点与极光 */
+        body::before {
+            content: ""; position: fixed; inset: 0; z-index: 9999; pointer-events: none;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+            opacity: 0.04;
+        }
+        .fluid-bg { position: fixed; inset: 0; z-index: -1; background: radial-gradient(circle at 50% 0%, #111827 0%, #000 70%); }
+        .blob { position: absolute; border-radius: 50%; filter: blur(120px); opacity: 0.4; animation: float 20s infinite alternate; }
+        .blob-1 { width: 50vw; height: 50vw; background: var(--brand-blue); top: -10vh; left: -10vw; }
+        .blob-2 { width: 40vw; height: 40vw; background: var(--brand-purple); bottom: 10vh; right: -10vw; animation-delay: -10s; }
+        @keyframes float { 100% { transform: translate(5%, 10%) scale(1.1); } }
+
+        /* 导航栏 */
+        nav {
+            position: fixed; top: 0; width: 100%; height: 70px; z-index: 1000;
+            display: flex; justify-content: center; align-items: center;
+            background: rgba(5, 5, 5, 0.5); backdrop-filter: blur(20px); border-bottom: 1px solid var(--glass-border);
+        }
+        .nav-inner { width: 100%; max-width: 1200px; padding: 0 24px; display: flex; justify-content: space-between; align-items: center; }
+        .brand { display: flex; align-items: center; gap: 12px; font-size: 18px; font-weight: 700; color: #fff; text-decoration: none; }
+        .brand img { width: 32px; height: 32px; border-radius: 8px; }
+        .nav-links { display: flex; gap: 32px; }
+        .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 14px; font-weight: 500; transition: color 0.3s; }
+        .nav-links a:hover, .nav-links a.active { color: #fff; }
+
+        /* 文档布局 */
+        .docs-layout { max-width: 1200px; margin: 140px auto 100px; padding: 0 24px; display: flex; gap: 60px; }
+        .sidebar { width: 250px; position: sticky; top: 100px; height: max-content; }
+        .sidebar h4 { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 20px; }
+        .sidebar ul { list-style: none; border-left: 1px solid var(--glass-border); }
+        .sidebar li a {
+            display: block; padding: 10px 20px; color: var(--text-muted); text-decoration: none;
+            font-size: 14px; border-left: 2px solid transparent; margin-left: -1px; transition: all 0.3s;
+        }
+        .sidebar li a:hover { color: #fff; }
+        .sidebar li a.active { color: var(--brand-blue); border-left-color: var(--brand-blue); background: linear-gradient(90deg, rgba(0,122,255,0.1) 0%, transparent 100%); }
+
+        /* 正文内容 */
+        .content { flex: 1; min-width: 0; }
+        .content h1 { font-size: 48px; font-weight: 800; margin-bottom: 16px; letter-spacing: -0.02em; }
+        .content > p { font-size: 18px; color: var(--text-muted); margin-bottom: 48px; }
+        
+        .doc-section { margin-bottom: 60px; scroll-margin-top: 100px; }
+        .doc-section h2 { font-size: 24px; font-weight: 700; color: #fff; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid var(--glass-border); }
+        .doc-section p { color: var(--text-muted); margin-bottom: 16px; font-size: 16px; }
+        .doc-section ul { padding-left: 20px; color: var(--text-muted); margin-bottom: 24px; }
+        .doc-section li { margin-bottom: 8px; }
+        
+        code { background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: var(--font-mono); font-size: 14px; color: #fff; }
+        
+        /* 终端代码块 */
+        .terminal {
+            background: #000; border: 1px solid var(--glass-border); border-radius: 16px;
+            overflow: hidden; margin: 24px 0; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        .term-head { background: #111; padding: 12px 16px; display: flex; gap: 8px; border-bottom: 1px solid #222; }
+        .term-dot { width: 12px; height: 12px; border-radius: 50%; }
+        .term-body { padding: 20px; font-family: var(--font-mono); font-size: 14px; color: #d4d4d4; line-height: 1.8; }
+
+        @media (max-width: 900px) {
+            .nav-links { display: none; }
+            .docs-layout { flex-direction: column; }
+            .sidebar { display: none; }
+            .content h1 { font-size: 36px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="fluid-bg"><div class="blob blob-1"></div><div class="blob blob-2"></div></div>
+
+    <nav>
+        <div class="nav-inner">
+            <a href="index.html" class="brand"><img src="logo.png" alt="Logo"> AuraWeather</a>
+            <div class="nav-links">
+                <a href="index.html">首页</a>
+                <a href="docs.html" class="active">编译文档</a>
+                <a href="changelog.html">更新日志</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="docs-layout">
+        <aside class="sidebar">
+            <h4>文档目录</h4>
+            <ul>
+                <li><a href="#env" class="active">环境依赖</a></li>
+                <li><a href="#compile">编译项目</a></li>
+                <li><a href="#package">打包安装</a></li>
+            </ul>
+        </aside>
+
+        <main class="content">
+            <h1>开发者文档</h1>
+            <p>从源码构建纯净的 AuraWeather Windows 桌面终端。</p>
+
+            <section class="doc-section" id="env">
+                <h2>1. 环境依赖</h2>
+                <p>本项目使用纯 C++ (Win32) 编写，依赖 OpenSSL 处理 HTTPS 请求。请确保你的系统为 Windows 10/11 64 位，并安装以下工具链：</p>
+                <ul>
+                    <li><strong>编译器</strong>：MSYS2 (UCRT64) 或 MinGW-w64</li>
+                    <li><strong>第三方库</strong>：OpenSSL 静态库</li>
+                </ul>
+                <p>在 MSYS2 终端中安装 OpenSSL：</p>
+                <div class="terminal">
+                    <div class="term-head">
+                        <div class="term-dot" style="background: #ff5f56;"></div>
+                        <div class="term-dot" style="background: #ffbd2e;"></div>
+                        <div class="term-dot" style="background: #27c93f;"></div>
+                    </div>
+                    <div class="term-body">pacman -S mingw-w64-ucrt-x86_64-openssl</div>
+                </div>
+            </section>
+
+            <section class="doc-section" id="compile">
+                <h2>2. 编译项目</h2>
+                <p>克隆仓库并执行一键构建脚本，编译完成后将生成无依赖的独立 <code>exe</code> 文件。</p>
+                <div class="terminal">
+                    <div class="term-head">
+                        <div class="term-dot" style="background: #ff5f56;"></div>
+                        <div class="term-dot" style="background: #ffbd2e;"></div>
+                        <div class="term-dot" style="background: #27c93f;"></div>
+                    </div>
+                    <div class="term-body">
+git clone https://github.com/Vertex-Wu/AuraWeather.git<br>
+cd AuraWeather<br>
+./build.bat
+                    </div>
+                </div>
+            </section>
+
+            <section class="doc-section" id="package">
+                <h2>3. 打包安装程序 (可选)</h2>
+                <p>如需自行生成安装包，请先下载安装 <a href="https://jrsoftware.org/isinfo.php" target="_blank" style="color:var(--brand-blue);">Inno Setup</a>，然后在项目根目录编译 <code>installer.iss</code> 即可。</p>
+            </section>
+        </main>
+    </div>
+</body>
+</html>

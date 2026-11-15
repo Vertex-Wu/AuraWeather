@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AuraWeather - 极致原生，硬核气象</title>
+    <link rel="icon" type="image/png" href="logo.png">
+    <style>
+        /* ================= 极客级重置与变量 ================= */
+        :root {
+            --bg: #050505;
+            --text-main: #ffffff;
+            --text-muted: #888888;
+            --brand-blue: #007aff;
+            --brand-cyan: #5ac8fa;
+            --brand-purple: #af52de;
+            
+            /* 液态玻璃参数 */
+            --glass-bg: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --glass-highlight: rgba(255, 255, 255, 0.3);
+            
+            --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif;
+            --font-mono: "SF Mono", "Fira Code", monospace;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-font-smoothing: antialiased; }
+        
+        body {
+            background-color: var(--bg);
+            color: var(--text-main);
+            font-family: var(--font-sans);
+            line-height: 1.6;
+            overflow-x: hidden;
+            perspective: 1000px; /* 开启 3D 视差 */
+        }
+
+        /* 全局噪点遮罩 (制造高级胶片质感) */
+        body::before {
+            content: ""; position: fixed; inset: 0; z-index: 9999; pointer-events: none;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+            opacity: 0.04;
+        }
+
+        /* ================= 流体动态背景 ================= */
+        .fluid-bg {
+            position: fixed; inset: 0; z-index: -1; overflow: hidden;
+            background: radial-gradient(circle at 50% 0%, #111827 0%, #000000 70%);
+        }
+        .blob {
+            position: absolute; border-radius: 50%; filter: blur(120px); opacity: 0.6;
+            animation: float 20s infinite ease-in-out alternate;
+        }
+        .blob-1 { width: 60vw; height: 60vw; background: var(--brand-blue); top: -20vh; left: -10vw; }
+        .blob-2 { width: 50vw; height: 50vw; background: var(--brand-purple); bottom: -10vh; right: -10vw; animation-delay: -10s; opacity: 0.3; }
+        
+        @keyframes float {
+            0% { transform: translate(0, 0) scale(1); }
+            100% { transform: translate(5%, 10%) scale(1.1); }
+        }
+
+        /* ================= 导航 ================= */
+        nav {
+            position: fixed; top: 0; width: 100%; height: 70px; z-index: 1000;
+            display: flex; justify-content: center; align-items: center;
+            background: rgba(5, 5, 5, 0.5); backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--glass-border);
+        }
+        .nav-inner {
+            width: 100%; max-width: 1200px; padding: 0 24px;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .brand { display: flex; align-items: center; gap: 12px; font-size: 18px; font-weight: 700; color: #fff; text-decoration: none; }
+        .brand img { width: 32px; height: 32px; border-radius: 8px; box-shadow: 0 0 15px rgba(255,255,255,0.1); }
+        .nav-links { display: flex; gap: 32px; }
+        .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 14px; font-weight: 500; transition: color 0.3s; }
+        .nav-links a:hover { color: #fff; }
+
+        /* ================= 按钮 (极光高光版) ================= */
+        .btn {
+            padding: 14px 32px; border-radius: 99px; font-size: 16px; font-weight: 600;
+            text-decoration: none; display: inline-flex; align-items: center; justify-content: center;
+            transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1); cursor: pointer;
+        }
+        .btn-primary {
+            background: #fff; color: #000;
+            box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.4);
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px) scale(1.02);
+            box-shadow: 0 0 30px 5px rgba(255, 255, 255, 0.3);
+        }
+        .btn-glass {
+            background: var(--glass-bg); border: 1px solid var(--glass-border); color: #fff;
+            backdrop-filter: blur(10px);
+        }
+        .btn-glass:hover { background: rgba(255,255,255,0.1); border-color: var(--glass-highlight); }
+
+        /* ================= 首屏 (极度沉浸) ================= */
+        .hero {
+            min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center;
+            text-align: center; padding: 120px 24px 60px;
+        }
+        .hero h1 {
+            font-size: clamp(48px, 8vw, 96px); font-weight: 800; letter-spacing: -0.04em; line-height: 1.05;
+            margin-bottom: 24px;
+            background: linear-gradient(180deg, #fff 30%, #888 100%);
+            background-clip: text;
+            -webkit-background-clip: text;
+            color: transparent;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 10px 30px rgba(255,255,255,0.1);
+        }
+        .hero p {
+            font-size: clamp(18px, 2vw, 24px); color: var(--text-muted); max-width: 700px;
+            margin-bottom: 48px; font-weight: 400;
+        }
+        .hero-actions { display: flex; gap: 16px; }
+
+        /* ================= 玻璃数据面板 (Liquid Glass) ================= */
+        .stats-container {
+            max-width: 1000px; margin: 0 auto; padding: 0 24px;
+            transform-style: preserve-3d; transform: rotateX(5deg); /* 微微倾斜 */
+            transition: transform 0.5s ease;
+        }
+        .stats-container:hover { transform: rotateX(0deg); }
+        
+        .stats-glass {
+            display: grid; grid-template-columns: repeat(3, 1fr);
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 32px;
+            padding: 40px;
+            backdrop-filter: blur(30px); -webkit-backdrop-filter: blur(30px);
+            box-shadow: 
+                inset 0 1px 1px var(--glass-highlight), 
+                inset 0 -1px 1px rgba(0,0,0,0.5),
+                0 20px 40px rgba(0,0,0,0.5);
+        }
+        .stat-item { text-align: center; position: relative; }
+        .stat-item:not(:last-child)::after {
+            content: ''; position: absolute; right: 0; top: 20%; height: 60%; width: 1px;
+            background: linear-gradient(to bottom, transparent, var(--glass-border), transparent);
+        }
+        .stat-value { font-size: 64px; font-weight: 800; color: #fff; line-height: 1; margin-bottom: 8px; font-family: var(--font-mono); }
+        .stat-label { font-size: 13px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 2px; font-weight: 600; }
+
+        /* ================= Bento Grid 2.0 (带光晕的悬停) ================= */
+        .features {
+            max-width: 1200px; margin: 120px auto; padding: 0 24px;
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px;
+        }
+        .feature-card {
+            background: #0a0a0a; border: 1px solid #222; border-radius: 24px; padding: 40px;
+            position: relative; overflow: hidden; transition: all 0.4s ease;
+        }
+        /* 鼠标悬停时，卡片边框发光 */
+        .feature-card::before {
+            content: ""; position: absolute; inset: -1px; border-radius: 24px;
+            background: linear-gradient(45deg, transparent, var(--brand-blue), transparent);
+            z-index: -1; opacity: 0; transition: opacity 0.4s ease;
+        }
+        .feature-card:hover { transform: translateY(-5px); border-color: transparent; }
+        .feature-card:hover::before { opacity: 1; }
+        
+        .feature-card.wide { grid-column: span 2; }
+        
+        .feature-card h3 { font-size: 24px; font-weight: 700; color: #fff; margin-bottom: 12px; }
+        .feature-card p { font-size: 15px; color: var(--text-muted); line-height: 1.6; }
+
+        /* 内嵌的 UI Mockup */
+        .mock-ui {
+            margin-top: 32px; background: linear-gradient(135deg, #111 0%, #000 100%);
+            border: 1px solid #333; border-radius: 16px; padding: 30px;
+            display: flex; justify-content: space-between; align-items: center;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
+        }
+        .mock-temp { font-size: 56px; font-weight: 700; color: #fff; font-family: var(--font-mono); }
+        .mock-icon { font-size: 64px; filter: drop-shadow(0 0 15px rgba(255,200,0,0.4)); }
+
+        /* 内嵌的代码块 */
+        .mock-code {
+            margin-top: 32px; background: #000; border: 1px solid #222; border-radius: 12px;
+            padding: 20px; font-family: var(--font-mono); font-size: 14px; color: #d4d4d4;
+            overflow-x: auto;
+        }
+        .c-kw { color: #569cd6; } .c-fn { color: #dcdcaa; } .c-str { color: #ce9178; } .c-cm { color: #6a9955; }
+
+        /* ================= 页脚 ================= */
+        footer {
+            border-top: 1px solid #222; padding: 60px 24px; text-align: center;
+            color: var(--text-muted); font-size: 14px;
+            background: #000;
+        }
+
+        /* 响应式 */
+        @media (max-width: 900px) {
+            .nav-links { display: none; }
+            .stats-glass { grid-template-columns: 1fr; gap: 40px; }
+            .stat-item:not(:last-child)::after { right: 20%; width: 60%; height: 1px; top: auto; bottom: -20px; background: linear-gradient(to right, transparent, var(--glass-border), transparent); }
+            .features { grid-template-columns: 1fr; }
+            .feature-card.wide { grid-column: span 1; }
+            .hero-actions { flex-direction: column; width: 100%; max-width: 300px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 动态流体背景 -->
+    <div class="fluid-bg">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+    </div>
+
+    <!-- 顶部导航 -->
+    <nav>
+        <div class="nav-inner">
+            <a href="index.html" class="brand">
+                <img src="logo.png" alt="Logo"> AuraWeather
+            </a>
+            <div class="nav-links">
+                <a href="index.html">首页</a>
+                <a href="docs.html">编译文档</a>
+                <a href="changelog.html">更新日志</a>
+            </div>
+            <a href="https://github.com/Vertex-Wu/AuraWeather" class="btn btn-glass" style="padding: 8px 20px; font-size: 14px;">GitHub ↗</a>
+        </div>
+    </nav>
+
+    <!-- 首屏 -->
+    <header class="hero">
+        <h1>原生渲染。<br>硬核气象。</h1>
+        <p>抛弃臃肿的 Web 套壳。基于纯 C++ (Win32) 打造的 Windows 桌面天气终端，带来极致的轻量与赛博本地预警体验。</p>
+        <div class="hero-actions">
+            <a href="https://github.com/Vertex-Wu/AuraWeather/releases/latest" class="btn btn-primary">
+                <svg style="width:20px;height:20px;margin-right:8px;fill:currentColor;" viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+               立刻下载
+            </a>
+            <a href="docs.html" class="btn btn-glass">阅读文档</a>
+        </div>
+    </header>
+
+    <main>
+        <!-- 玻璃数据面板 -->
+        <section class="stats-container">
+            <div class="stats-glass">
+                <div class="stat-item">
+                    <div class="stat-value">&lt;5M</div>
+                    <div class="stat-label">单文件体积</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">0</div>
+                    <div class="stat-label">第三方依赖</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">50ms</div>
+                    <div class="stat-label">冷启动时间</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 光晕悬停网格 -->
+        <section class="features">
+            <div class="feature-card wide">
+                <h3>沉浸式极简视界</h3>
+                <p>独创的超大尺寸天气主图标，深度适配系统暗黑/亮色模式。去除一切视觉干扰，让天气成为绝对主角。</p>
+                <img src="screenshot.png" alt="AuraWeather UI" style="width: 100%; border-radius: var(--radius-sm); margin-top: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1);">
+            </div>
+            
+            <div class="feature-card">
+                <h3>纯本地预警引擎</h3>
+                <p>无第三方 API 依赖。底层直连物理阈值，自动监测极端天气并触发高优先级警报。</p>
+            </div>
+
+            <div class="feature-card">
+                <h3>绝对绿色便携</h3>
+                <p>所有配置、缓存均锁定在安装目录下，绝不向系统 AppData 写入任何垃圾文件，纯净无痕。</p>
+            </div>
+
+            <div class="feature-card wide">
+                <h3>硬核底层，毫无妥协</h3>
+                <p>纯 C++ 编写的底层气象判定逻辑，毫秒级响应。</p>
+                <div class="mock-code">
+<span class="c-cm">// AuraWeather Alert Core</span>
+<span class="c-kw">if</span> (weather.precipitation > <span class="c-str">16.0f</span>) {
+    alert.<span class="c-fn">trigger</span>(<span class="c-str">"【暴雨预警】短时强降水"</span>);
+} <span class="c-kw">else if</span> (weather.wind_speed > <span class="c-str">24.5f</span>) {
+    alert.<span class="c-fn">trigger</span>(<span class="c-str">"【狂风预警】极度危险"</span>);
+}
+app.<span class="c-fn">render_ui</span>(alert);
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div>&copy; 2026 Vertex-Wu. Built with Pure C++ & Passion.</div>
+        <div style="margin-top: 12px;">
+            <a href="https://github.com/Vertex-Wu/AuraWeather" style="color: var(--text-muted); text-decoration: none;">GitHub</a>
+            <span style="margin: 0 10px;">·</span>
+            <a href="https://github.com/Vertex-Wu/AuraWeather/blob/main/LICENSE" style="color: var(--text-muted); text-decoration: none;">MIT License</a>
+        </div>
+    </footer>
+
+</body>
+</html>
