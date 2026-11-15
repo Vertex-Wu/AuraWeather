@@ -7,6 +7,15 @@
 
 AuraWeather 是一款基于纯 C++ (Win32 API) 开发的 Windows 原生天气软件。不使用第三方 UI 框架，最终交付为一个静态编译的单文件 `.exe`。
 
+### 样式
+##暗色
+<img width="1439" height="857" alt="0aed74d9b13fa33297d5626c8d10f438" src="https://github.com/user-attachments/assets/f3ba1a3d-5c21-4a69-91ed-17df9befd7be" />
+
+##亮色
+<img width="1439" height="859" alt="image" src="https://github.com/user-attachments/assets/3260d689-02d1-44f4-9517-9b9cbeb0275e" />
+
+
+
 ## 软件介绍
 
 AuraWeather 致力于在 Windows 平台上提供极致的轻量级天气体验。软件采用原生 GDI/GDI+ 渲染，具有极低的内存占用，并适配了系统的暗黑/亮色主题与高 DPI 缩放。
